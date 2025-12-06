@@ -1,3 +1,4 @@
+--// Servisler
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -7,9 +8,142 @@ local player = Players.LocalPlayer
 -- Auto Attack Fonksiyonları
 local autoAttackEnabled = false
 local autoAttackConnection = nil
+local gui = nil
+local aaOn = nil
+local aaOff = nil
+
+local function startAutoAttack()
+	if autoAttackConnection then
+		autoAttackConnection:Disconnect()
+		autoAttackConnection = nil
+	end
+	
+	_G.FastAttack = true
+	
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local Players = game:GetService("Players")
+	local Player = Players.LocalPlayer
+	
+	local function SafeWaitForChild(parent, childName)
+		local success, result = pcall(function()
+			return parent:WaitForChild(childName, 5)
+		end)
+		return success and result or nil
+	end
+	
+	local Remotes = SafeWaitForChild(ReplicatedStorage, "Remotes")
+	if not Remotes then return end
+	
+	local Modules = SafeWaitForChild(ReplicatedStorage, "Modules")
+	local Net = Modules and SafeWaitForChild(Modules, "Net")
+	
+	if not Net then return end
+	
+	local RegisterAttack = SafeWaitForChild(Net, "RE/RegisterAttack")
+	local RegisterHit = SafeWaitForChild(Net, "RE/RegisterHit")
+	local Enemies = workspace:FindFirstChild("Enemies")
+	local Characters = workspace:FindFirstChild("Characters")
+	
+	if not RegisterAttack or not RegisterHit then return end
+	
+	local Distance = 100
+	
+	local function IsAlive(character)
+		return character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0
+	end
+	
+	local function ProcessEnemies(OthersEnemies, Folder)
+		if not Folder then return nil end
+		local BasePart = nil
+		for _, Enemy in Folder:GetChildren() do
+			local Head = Enemy:FindFirstChild("Head")
+			if Head and IsAlive(Enemy) and Player:DistanceFromCharacter(Head.Position) < Distance then
+				if Enemy ~= Player.Character then
+					table.insert(OthersEnemies, { Enemy, Head })
+					BasePart = Head
+				end
+			end
+		end
+		return BasePart
+	end
+	
+	local function AttackNearest()
+		if not autoAttackEnabled then return end
+		
+		local OthersEnemies = {}
+		local Part1 = ProcessEnemies(OthersEnemies, Enemies)
+		local Part2 = ProcessEnemies(OthersEnemies, Characters)
+		
+		local character = Player.Character
+		if not character then return end
+		local equippedWeapon = character:FindFirstChildOfClass("Tool")
+		
+		if equippedWeapon and equippedWeapon:FindFirstChild("LeftClickRemote") then
+			for _, enemyData in ipairs(OthersEnemies) do
+				local enemy = enemyData[1]
+				if enemy and enemy:FindFirstChild("HumanoidRootPart") then
+					local direction = (enemy.HumanoidRootPart.Position - character:GetPivot().Position).Unit
+					pcall(function()
+						equippedWeapon.LeftClickRemote:FireServer(direction, 1)
+					end)
+				end
+			end
+		elseif #OthersEnemies > 0 then
+			local BasePart = Part1 or Part2
+			if BasePart then
+				pcall(function()
+					RegisterAttack:FireServer(0)
+					RegisterHit:FireServer(BasePart, OthersEnemies)
+				end)
+			end
+		end
+	end
+	
+	autoAttackConnection = RunService.RenderStepped:Connect(function()
+		if autoAttackEnabled then
+			local character = Player.Character
+			if character and IsAlive(character) then
+				local equippedWeapon = character:FindFirstChildOfClass("Tool")
+				if equippedWeapon and equippedWeapon.ToolTip ~= "Gun" then
+					AttackNearest()
+				end
+			end
+		end
+	end)
+end
+
+local function toggleAutoAttack(enable)
+	autoAttackEnabled = enable
+	_G.FastAttack = enable
+	
+	if enable then
+		if aaOn then
+			aaOn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+		end
+		if aaOff then
+			aaOff.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		end
+		startAutoAttack()
+	else
+		if aaOn then
+			aaOn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		end
+		if aaOff then
+			aaOff.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+		end
+		if autoAttackConnection then
+			autoAttackConnection:Disconnect()
+			autoAttackConnection = nil
+		end
+	end
+end
 
 local function initializeAutoGUI()
-	local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+	if gui and gui.Parent then
+		gui:Destroy()
+	end
+	
+	gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 	gui.Name = "AutoGUI"
 	gui.ResetOnSpawn = false
 
@@ -24,7 +158,7 @@ local function initializeAutoGUI()
 	local title = Instance.new("TextLabel", main)
 	title.Size = UDim2.new(1, -60, 0, 30)
 	title.Position = UDim2.new(0, 10, 0, 5)
-	title.Text = "Auto Syntaskk"
+	title.Text = "Auto G"
 	title.Font = Enum.Font.GothamBold
 	title.TextSize = 18
 	title.TextColor3 = Color3.new(1, 1, 1)
@@ -49,7 +183,7 @@ local function initializeAutoGUI()
 	aaLabel.TextSize = 16
 	aaLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-	local aaOff = Instance.new("TextButton", main)
+	aaOff = Instance.new("TextButton", main)
 	aaOff.Size = UDim2.new(0, 80, 0, 35)
 	aaOff.Position = UDim2.new(0, 20, 0, 75)
 	aaOff.Text = "KAPAT"
@@ -59,7 +193,7 @@ local function initializeAutoGUI()
 	aaOff.TextSize = 14
 	Instance.new("UICorner", aaOff).CornerRadius = UDim.new(0, 6)
 
-	local aaOn = Instance.new("TextButton", main)
+	aaOn = Instance.new("TextButton", main)
 	aaOn.Size = UDim2.new(0, 80, 0, 35)
 	aaOn.Position = UDim2.new(1, -100, 0, 75)
 	aaOn.Text = "AÇ"
@@ -69,181 +203,83 @@ local function initializeAutoGUI()
 	aaOn.TextSize = 14
 	Instance.new("UICorner", aaOn).CornerRadius = UDim.new(0, 6)
 
-	-- Auto Attack Fonksiyonu
-	local function startAutoAttack()
-		if autoAttackConnection then
-			autoAttackConnection:Disconnect()
-			autoAttackConnection = nil
-		end
-		
-		_G.FastAttack = true
-		
-		local ReplicatedStorage = game:GetService("ReplicatedStorage")
-		local Players = game:GetService("Players")
-		local Player = Players.LocalPlayer
-		
-		local function SafeWaitForChild(parent, childName)
-			local success, result = pcall(function()
-				return parent:WaitForChild(childName, 5)
-			end)
-			return success and result or nil
-		end
-		
-		local Remotes = SafeWaitForChild(ReplicatedStorage, "Remotes")
-		if not Remotes then return end
-		
-		local Modules = SafeWaitForChild(ReplicatedStorage, "Modules")
-		local Net = Modules and SafeWaitForChild(Modules, "Net")
-		
-		if not Net then return end
-		
-		local RegisterAttack = SafeWaitForChild(Net, "RE/RegisterAttack")
-		local RegisterHit = SafeWaitForChild(Net, "RE/RegisterHit")
-		local Enemies = workspace:FindFirstChild("Enemies")
-		local Characters = workspace:FindFirstChild("Characters")
-		
-		if not RegisterAttack or not RegisterHit then return end
-		
-		local Distance = 100
-		
-		local function IsAlive(character)
-			return character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0
-		end
-		
-		local function ProcessEnemies(OthersEnemies, Folder)
-			if not Folder then return nil end
-			local BasePart = nil
-			for _, Enemy in Folder:GetChildren() do
-				local Head = Enemy:FindFirstChild("Head")
-				if Head and IsAlive(Enemy) and Player:DistanceFromCharacter(Head.Position) < Distance then
-					if Enemy ~= Player.Character then
-						table.insert(OthersEnemies, { Enemy, Head })
-						BasePart = Head
-					end
-				end
-			end
-			return BasePart
-		end
-		
-		local function AttackNearest()
-			if not autoAttackEnabled then return end
-			
-			local OthersEnemies = {}
-			local Part1 = ProcessEnemies(OthersEnemies, Enemies)
-			local Part2 = ProcessEnemies(OthersEnemies, Characters)
-			
-			local character = Player.Character
-			if not character then return end
-			local equippedWeapon = character:FindFirstChildOfClass("Tool")
-			
-			if equippedWeapon and equippedWeapon:FindFirstChild("LeftClickRemote") then
-				for _, enemyData in ipairs(OthersEnemies) do
-					local enemy = enemyData[1]
-					if enemy and enemy:FindFirstChild("HumanoidRootPart") then
-						local direction = (enemy.HumanoidRootPart.Position - character:GetPivot().Position).Unit
-						pcall(function()
-							equippedWeapon.LeftClickRemote:FireServer(direction, 1)
-						end)
-					end
-				end
-			elseif #OthersEnemies > 0 then
-				local BasePart = Part1 or Part2
-				if BasePart then
-					pcall(function()
-						RegisterAttack:FireServer(0)
-						RegisterHit:FireServer(BasePart, OthersEnemies)
-					end)
-				end
-			end
-		end
-		
-		autoAttackConnection = RunService.RenderStepped:Connect(function()
-			if autoAttackEnabled then
-				local character = Player.Character
-				if character and IsAlive(character) then
-					local equippedWeapon = character:FindFirstChildOfClass("Tool")
-					if equippedWeapon and equippedWeapon.ToolTip ~= "Gun" then
-						AttackNearest()
-					end
-				end
-			end
-		end)
-	end
-
 	-- Buton Etkileşimleri
 	aaOn.MouseButton1Click:Connect(function()
-		if not autoAttackEnabled then
-			autoAttackEnabled = true
-			aaOn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-			aaOff.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-			startAutoAttack()
-		end
+		toggleAutoAttack(true)
 	end)
 
 	aaOff.MouseButton1Click:Connect(function()
-		if autoAttackEnabled then
-			autoAttackEnabled = false
-			aaOff.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-			aaOn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-			
-			_G.FastAttack = false
-			if autoAttackConnection then
-				autoAttackConnection:Disconnect()
-				autoAttackConnection = nil
-			end
-		end
+		toggleAutoAttack(false)
 	end)
 
 	closeBtn.MouseButton1Click:Connect(function()
-		-- Auto Attack'ı kapat
-		autoAttackEnabled = false
-		_G.FastAttack = false
-		if autoAttackConnection then
-			autoAttackConnection:Disconnect()
-			autoAttackConnection = nil
-		end
+		toggleAutoAttack(false)
 		gui:Destroy()
 	end)
 
-	-- Karakter öldüğünde auto attack'ı kapat
-	player.CharacterAdded:Connect(function()
-		if player.Character then
-			player.Character:WaitForChild("Humanoid").Died:Connect(function()
-				autoAttackEnabled = false
-				_G.FastAttack = false
-				if autoAttackConnection then
-					autoAttackConnection:Disconnect()
-					autoAttackConnection = nil
+	-- Ölüm durumunda tekrar açılması için karakter takibi
+	local function setupCharacterEvents(character)
+		if character then
+			local humanoid = character:WaitForChild("Humanoid")
+			
+			-- Öldüğünde Auto Attack'ı kapat
+			humanoid.Died:Connect(function()
+				toggleAutoAttack(false)
+			end)
+			
+			-- Canlandığında tekrar aç (5 saniye sonra)
+			humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+				if humanoid.Health > 0 then
+					-- 5 saniye bekle ve auto attack'ı aç
+					task.delay(5, function()
+						if humanoid.Health > 0 and gui and gui.Parent then
+							toggleAutoAttack(true)
+						end
+					end)
 				end
 			end)
 		end
-	end)
+	end
 
-	-- GUI yok edildiğinde temizle
+	-- Mevcut karakter için event'leri kur
+	if player.Character then
+		setupCharacterEvents(player.Character)
+	end
+
+	-- Yeni karakter eklendiğinde
+	player.CharacterAdded:Connect(function(character)
+		setupCharacterEvents(character)
+		
+		-- Karakter spawn olduğunda 5 saniye sonra auto attack'ı aç
+		task.wait(1) -- Spawn tamamlanması için bekle
+		task.delay(5, function()
+			if character and character:FindFirstChild("Humanoid") and 
+			   character.Humanoid.Health > 0 and gui and gui.Parent then
+				toggleAutoAttack(true)
+			end
+		end)
+	end)
+	
+	-- Başlangıçta Auto Attack'ı aç (eğer karakter varsa)
+	if player.Character and player.Character:FindFirstChild("Humanoid") and 
+	   player.Character.Humanoid.Health > 0 then
+		task.wait(2) -- Oyunun yüklenmesi için bekle
+		toggleAutoAttack(true)
+	end
+end
+
+-- GUI yok edildiğinde temizle
+if gui then
 	gui.Destroying:Connect(function()
-		autoAttackEnabled = false
-		_G.FastAttack = false
-		if autoAttackConnection then
-			autoAttackConnection:Disconnect()
-			autoAttackConnection = nil
-		end
+		toggleAutoAttack(false)
 	end)
 end
 
--- Karakter eklendiğinde GUI'yi başlat
-player.CharacterAdded:Connect(function()
-	wait(0.5)
-	if player:FindFirstChild("PlayerGui"):FindFirstChild("AutoGUI") then
-		player.PlayerGui.AutoGUI:Destroy()
-	end
-	wait(0.1)
-	initializeAutoGUI()
-end)
-
 -- İlk Yüklenme
-wait(1)
+task.wait(2) -- Oyunun yüklenmesi için bekle
 initializeAutoGUI()
 
 
 loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/20f318386e3fbf069ee3fa797cfc9f34.lua"))()
+
 
