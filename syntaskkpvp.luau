@@ -5,6 +5,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 
+_G.SyntaskkSettings = _G.SyntaskkSettings or {
+	speed = false,
+	dash = false,
+	esp = false,
+	autoAttack = false
+}
+
 local function initializeUI()
 	local char = player.Character or player.CharacterAdded:Wait()
 	local humanoid = char:WaitForChild("Humanoid")
@@ -17,7 +24,6 @@ local function initializeUI()
 	gui.Name = "SyntaskkPVP"
 	gui.ResetOnSpawn = false
 
-	-- Ana Frame (Büyütüldü - Auto Attack için)
 	local main = Instance.new("Frame", gui)
 	main.Size = UDim2.new(0, 180, 0, 222)
 	main.Position = UDim2.new(0, 10, 0.5, -111)
@@ -26,13 +32,11 @@ local function initializeUI()
 	main.Active = true
 	Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
 
-	-- Glow efekti
 	local stroke = Instance.new("UIStroke", main)
 	stroke.Color = Color3.fromRGB(100, 100, 255)
 	stroke.Thickness = 1.5
 	stroke.Transparency = 0.5
 
-	-- Başlık
 	local title = Instance.new("TextLabel", main)
 	title.Size = UDim2.new(1, 0, 0, 30)
 	title.Position = UDim2.new(0, 0, 0, 0)
@@ -42,18 +46,16 @@ local function initializeUI()
 	title.TextColor3 = Color3.fromRGB(150, 150, 255)
 	title.BackgroundTransparency = 1
 
-	-- Değişkenler
-	local speedEnabled = false
-	local dashEnabled = false
-	local playerEspEnabled = false
-	local autoAttackEnabled = false
+	local speedEnabled = _G.SyntaskkSettings.speed
+	local dashEnabled = _G.SyntaskkSettings.dash
+	local playerEspEnabled = _G.SyntaskkSettings.esp
+	local autoAttackEnabled = _G.SyntaskkSettings.autoAttack
 	local autoAttackConnection = nil
 	local espTextObjects = {}
 	local defaultSpeed = 16
 	local customSpeed = 150
 
-	-- Toggle Butonu Oluşturucu
-	local function createToggle(name, yPos, callback)
+	local function createToggle(name, yPos, defaultState, callback)
 		local container = Instance.new("Frame", main)
 		container.Size = UDim2.new(1, -20, 0, 32)
 		container.Position = UDim2.new(0, 10, 0, yPos)
@@ -71,13 +73,13 @@ local function initializeUI()
 		local toggleBg = Instance.new("Frame", container)
 		toggleBg.Size = UDim2.new(0, 44, 0, 22)
 		toggleBg.Position = UDim2.new(1, -44, 0.5, -11)
-		toggleBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		toggleBg.BackgroundColor3 = defaultState and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(60, 60, 60)
 		Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
 
 		local toggleCircle = Instance.new("Frame", toggleBg)
 		toggleCircle.Size = UDim2.new(0, 18, 0, 18)
-		toggleCircle.Position = UDim2.new(0, 2, 0.5, -9)
-		toggleCircle.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+		toggleCircle.Position = defaultState and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+		toggleCircle.BackgroundColor3 = defaultState and Color3.new(1, 1, 1) or Color3.fromRGB(180, 180, 180)
 		Instance.new("UICorner", toggleCircle).CornerRadius = UDim.new(1, 0)
 
 		local btn = Instance.new("TextButton", toggleBg)
@@ -85,7 +87,7 @@ local function initializeUI()
 		btn.BackgroundTransparency = 1
 		btn.Text = ""
 
-		local enabled = false
+		local enabled = defaultState
 
 		btn.MouseButton1Click:Connect(function()
 			enabled = not enabled
@@ -101,10 +103,15 @@ local function initializeUI()
 			callback(enabled)
 		end)
 
+		if defaultState then
+			task.spawn(function()
+				callback(true)
+			end)
+		end
+
 		return btn
 	end
 
-	-- Infinite Jump Label (Her zaman açık)
 	local ijContainer = Instance.new("Frame", main)
 	ijContainer.Size = UDim2.new(1, -20, 0, 32)
 	ijContainer.Position = UDim2.new(0, 10, 0, 38)
@@ -129,18 +136,18 @@ local function initializeUI()
 	ijStatus.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
 	Instance.new("UICorner", ijStatus).CornerRadius = UDim.new(1, 0)
 
-	-- Speed Toggle
-	createToggle("Speed", 75, function(enabled)
+	createToggle("Speed", 75, _G.SyntaskkSettings.speed, function(enabled)
 		speedEnabled = enabled
+		_G.SyntaskkSettings.speed = enabled
 		if not enabled then
 			local h = player.Character and player.Character:FindFirstChild("Humanoid")
 			if h then h.WalkSpeed = defaultSpeed end
 		end
 	end)
 
-	-- Dash Length Toggle
-	createToggle("Dash Length", 112, function(enabled)
+	createToggle("Dash Length", 112, _G.SyntaskkSettings.dash, function(enabled)
 		dashEnabled = enabled
+		_G.SyntaskkSettings.dash = enabled
 		local c = player.Character
 		if c then
 			if enabled then
@@ -153,70 +160,74 @@ local function initializeUI()
 		end
 	end)
 
-	-- Player ESP Toggle
-	createToggle("Player ESP", 149, function(enabled)
+	local function setupESP()
+		local Camera = workspace.CurrentCamera
+		local localPlayer = player
+
+		local function createESPText(character, plr)
+			if not character or not character:FindFirstChild("Head") then return end
+			
+			local nameText = Drawing.new("Text")
+			nameText.Visible = false
+			nameText.Center = true
+			nameText.Outline = true
+			nameText.Color = Color3.fromRGB(0, 255, 0)
+			nameText.Size = 18
+			nameText.Font = 2
+			
+			local connection
+			connection = RunService.RenderStepped:Connect(function()
+				if not playerEspEnabled or not character or not character:FindFirstChild("Head") or
+				   not character:FindFirstChild("Humanoid") or character.Humanoid.Health <= 0 or
+				   not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+					nameText:Remove()
+					connection:Disconnect()
+					espTextObjects[plr.UserId] = nil
+					return
+				end
+				
+				local head = character.Head
+				local localHrp = localPlayer.Character.HumanoidRootPart
+				local distance = (localHrp.Position - head.Position).Magnitude
+				
+				local headPos = head.Position + Vector3.new(0, 2, 0)
+				local headVector, onScreen = Camera:WorldToViewportPoint(headPos)
+				
+				if onScreen then
+					nameText.Position = Vector2.new(headVector.X, headVector.Y)
+					nameText.Text = plr.Name .. " [" .. math.floor(distance) .. "m]"
+					nameText.Visible = true
+					
+					local hp = character.Humanoid.Health / character.Humanoid.MaxHealth
+					nameText.Color = hp > 0.4 and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+				else
+					nameText.Visible = false
+				end
+			end)
+			
+			espTextObjects[plr.UserId] = {connection = connection, nameText = nameText}
+		end
+
+		for _, plr in pairs(Players:GetPlayers()) do
+			if plr ~= localPlayer and plr.Character then
+				createESPText(plr.Character, plr)
+			end
+		end
+
+		Players.PlayerAdded:Connect(function(plr)
+			plr.CharacterAdded:Connect(function(c)
+				task.wait(0.5)
+				if playerEspEnabled then createESPText(c, plr) end
+			end)
+		end)
+	end
+
+	createToggle("Player ESP", 149, _G.SyntaskkSettings.esp, function(enabled)
 		playerEspEnabled = enabled
+		_G.SyntaskkSettings.esp = enabled
 		
 		if enabled then
-			local Camera = workspace.CurrentCamera
-			local localPlayer = player
-
-			local function createESPText(character, plr)
-				if not character or not character:FindFirstChild("Head") then return end
-				
-				local nameText = Drawing.new("Text")
-				nameText.Visible = false
-				nameText.Center = true
-				nameText.Outline = true
-				nameText.Color = Color3.fromRGB(0, 255, 0)
-				nameText.Size = 18
-				nameText.Font = 2
-				
-				local connection
-				connection = RunService.RenderStepped:Connect(function()
-					if not playerEspEnabled or not character or not character:FindFirstChild("Head") or
-					   not character:FindFirstChild("Humanoid") or character.Humanoid.Health <= 0 or
-					   not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-						nameText:Remove()
-						connection:Disconnect()
-						espTextObjects[plr.UserId] = nil
-						return
-					end
-					
-					local head = character.Head
-					local localHrp = localPlayer.Character.HumanoidRootPart
-					local distance = (localHrp.Position - head.Position).Magnitude
-					
-					local headPos = head.Position + Vector3.new(0, 2, 0)
-					local headVector, onScreen = Camera:WorldToViewportPoint(headPos)
-					
-					if onScreen then
-						nameText.Position = Vector2.new(headVector.X, headVector.Y)
-						nameText.Text = plr.Name .. " [" .. math.floor(distance) .. "m]"
-						nameText.Visible = true
-						
-						local hp = character.Humanoid.Health / character.Humanoid.MaxHealth
-						nameText.Color = hp > 0.4 and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-					else
-						nameText.Visible = false
-					end
-				end)
-				
-				espTextObjects[plr.UserId] = {connection = connection, nameText = nameText}
-			end
-
-			for _, plr in pairs(Players:GetPlayers()) do
-				if plr ~= localPlayer and plr.Character then
-					createESPText(plr.Character, plr)
-				end
-			end
-
-			Players.PlayerAdded:Connect(function(plr)
-				plr.CharacterAdded:Connect(function(c)
-					task.wait(0.5)
-					if playerEspEnabled then createESPText(c, plr) end
-				end)
-			end)
+			setupESP()
 		else
 			for _, data in pairs(espTextObjects) do
 				if data.connection then data.connection:Disconnect() end
@@ -226,7 +237,6 @@ local function initializeUI()
 		end
 	end)
 
-	-- Auto Attack Fonksiyonu
 	local function startAutoAttack()
 		if autoAttackConnection then
 			autoAttackConnection:Disconnect()
@@ -317,9 +327,9 @@ local function initializeUI()
 		end)
 	end
 
-	-- Auto Attack Toggle
-	createToggle("Auto Attack", 186, function(enabled)
+	createToggle("Auto Attack", 186, _G.SyntaskkSettings.autoAttack, function(enabled)
 		autoAttackEnabled = enabled
+		_G.SyntaskkSettings.autoAttack = enabled
 		_G.FastAttack = enabled
 		
 		if enabled then
@@ -332,7 +342,6 @@ local function initializeUI()
 		end
 	end)
 
-	-- Infinite Jump (Her zaman aktif)
 	local jumpConn
 	jumpConn = UIS.JumpRequest:Connect(function()
 		local c = player.Character
@@ -341,7 +350,6 @@ local function initializeUI()
 		end
 	end)
 
-	-- RenderStepped Loop
 	local renderConn
 	renderConn = RunService.RenderStepped:Connect(function()
 		if speedEnabled then
@@ -357,7 +365,6 @@ local function initializeUI()
 		end
 	end)
 
-	-- Temizlik
 	humanoid.Died:Connect(function()
 		for _, data in pairs(espTextObjects) do
 			if data.connection then data.connection:Disconnect() end
@@ -365,8 +372,6 @@ local function initializeUI()
 		end
 		espTextObjects = {}
 		
-		-- Auto Attack'ı kapat
-		autoAttackEnabled = false
 		if autoAttackConnection then
 			autoAttackConnection:Disconnect()
 			autoAttackConnection = nil
@@ -383,7 +388,6 @@ local function initializeUI()
 		end
 	end)
 
-	-- Sürükleme
 	local dragging, dragStart, startPos
 	main.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -407,11 +411,9 @@ local function initializeUI()
 	end)
 end
 
--- Karakter yeniden doğarsa
 player.CharacterAdded:Connect(function()
 	wait(0.5)
 	initializeUI()
 end)
 
--- İlk yükleme
 initializeUI()
