@@ -1,14 +1,13 @@
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 
 local function initializeUI()
 	local char = player.Character or player.CharacterAdded:Wait()
 	local humanoid = char:WaitForChild("Humanoid")
-
 
 	if player:FindFirstChild("PlayerGui"):FindFirstChild("SyntaskkPVP") then
 		player.PlayerGui.SyntaskkPVP:Destroy()
@@ -18,10 +17,10 @@ local function initializeUI()
 	gui.Name = "SyntaskkPVP"
 	gui.ResetOnSpawn = false
 
-	-- Ana Frame (Küçük, kenarda)
+	-- Ana Frame (Büyütüldü - Auto Attack için)
 	local main = Instance.new("Frame", gui)
-	main.Size = UDim2.new(0, 180, 0, 185)
-	main.Position = UDim2.new(0, 10, 0.5, -92)
+	main.Size = UDim2.new(0, 180, 0, 222)
+	main.Position = UDim2.new(0, 10, 0.5, -111)
 	main.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 	main.BorderSizePixel = 0
 	main.Active = true
@@ -47,6 +46,8 @@ local function initializeUI()
 	local speedEnabled = false
 	local dashEnabled = false
 	local playerEspEnabled = false
+	local autoAttackEnabled = false
+	local autoAttackConnection = nil
 	local espTextObjects = {}
 	local defaultSpeed = 16
 	local customSpeed = 150
@@ -157,7 +158,6 @@ local function initializeUI()
 		playerEspEnabled = enabled
 		
 		if enabled then
-			-- ESP Başlat
 			local Camera = workspace.CurrentCamera
 			local localPlayer = player
 
@@ -218,12 +218,117 @@ local function initializeUI()
 				end)
 			end)
 		else
-			-- ESP Kapat
 			for _, data in pairs(espTextObjects) do
 				if data.connection then data.connection:Disconnect() end
 				if data.nameText then data.nameText:Remove() end
 			end
 			espTextObjects = {}
+		end
+	end)
+
+	-- Auto Attack Fonksiyonu
+	local function startAutoAttack()
+		if autoAttackConnection then
+			autoAttackConnection:Disconnect()
+			autoAttackConnection = nil
+		end
+		
+		_G.FastAttack = true
+		
+		local function SafeWaitForChild(parent, childName)
+			local success, result = pcall(function()
+				return parent:WaitForChild(childName, 5)
+			end)
+			return success and result or nil
+		end
+		
+		local Remotes = SafeWaitForChild(ReplicatedStorage, "Remotes")
+		local Modules = SafeWaitForChild(ReplicatedStorage, "Modules")
+		local Net = Modules and SafeWaitForChild(Modules, "Net")
+		
+		local RegisterAttack = Net and SafeWaitForChild(Net, "RE/RegisterAttack")
+		local RegisterHit = Net and SafeWaitForChild(Net, "RE/RegisterHit")
+		local Enemies = workspace:FindFirstChild("Enemies")
+		local Characters = workspace:FindFirstChild("Characters")
+		
+		local Distance = 100
+		
+		local function IsAlive(character)
+			return character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0
+		end
+		
+		local function ProcessEnemies(OthersEnemies, Folder)
+			if not Folder then return nil end
+			local BasePart = nil
+			for _, Enemy in Folder:GetChildren() do
+				local Head = Enemy:FindFirstChild("Head")
+				if Head and IsAlive(Enemy) and player:DistanceFromCharacter(Head.Position) < Distance then
+					if Enemy ~= player.Character then
+						table.insert(OthersEnemies, { Enemy, Head })
+						BasePart = Head
+					end
+				end
+			end
+			return BasePart
+		end
+		
+		local function AttackNearest()
+			if not autoAttackEnabled then return end
+			
+			local OthersEnemies = {}
+			local Part1 = ProcessEnemies(OthersEnemies, Enemies)
+			local Part2 = ProcessEnemies(OthersEnemies, Characters)
+			
+			local character = player.Character
+			if not character then return end
+			local equippedWeapon = character:FindFirstChildOfClass("Tool")
+			
+			if equippedWeapon and equippedWeapon:FindFirstChild("LeftClickRemote") then
+				for _, enemyData in ipairs(OthersEnemies) do
+					local enemy = enemyData[1]
+					if enemy and enemy:FindFirstChild("HumanoidRootPart") then
+						local direction = (enemy.HumanoidRootPart.Position - character:GetPivot().Position).Unit
+						pcall(function()
+							equippedWeapon.LeftClickRemote:FireServer(direction, 1)
+						end)
+					end
+				end
+			elseif #OthersEnemies > 0 and RegisterAttack and RegisterHit then
+				local BasePart = Part1 or Part2
+				if BasePart then
+					pcall(function()
+						RegisterAttack:FireServer(0)
+						RegisterHit:FireServer(BasePart, OthersEnemies)
+					end)
+				end
+			end
+		end
+		
+		autoAttackConnection = RunService.RenderStepped:Connect(function()
+			if autoAttackEnabled then
+				local character = player.Character
+				if character and IsAlive(character) then
+					local equippedWeapon = character:FindFirstChildOfClass("Tool")
+					if not equippedWeapon or (equippedWeapon and equippedWeapon.ToolTip ~= "Gun") then
+						AttackNearest()
+					end
+				end
+			end
+		end)
+	end
+
+	-- Auto Attack Toggle
+	createToggle("Auto Attack", 186, function(enabled)
+		autoAttackEnabled = enabled
+		_G.FastAttack = enabled
+		
+		if enabled then
+			startAutoAttack()
+		else
+			if autoAttackConnection then
+				autoAttackConnection:Disconnect()
+				autoAttackConnection = nil
+			end
 		end
 	end)
 
@@ -246,8 +351,8 @@ local function initializeUI()
 		if dashEnabled then
 			local c = player.Character
 			if c then
-				c:SetAttribute("DashLength", 100)
-				c:SetAttribute("DashSpeed", 100)
+				c:SetAttribute("DashLength", 150)
+				c:SetAttribute("DashSpeed", 150)
 			end
 		end
 	end)
@@ -259,11 +364,19 @@ local function initializeUI()
 			if data.nameText then data.nameText:Remove() end
 		end
 		espTextObjects = {}
+		
+		-- Auto Attack'ı kapat
+		autoAttackEnabled = false
+		if autoAttackConnection then
+			autoAttackConnection:Disconnect()
+			autoAttackConnection = nil
+		end
 	end)
 
 	gui.Destroying:Connect(function()
 		if renderConn then renderConn:Disconnect() end
 		if jumpConn then jumpConn:Disconnect() end
+		if autoAttackConnection then autoAttackConnection:Disconnect() end
 		for _, data in pairs(espTextObjects) do
 			if data.connection then data.connection:Disconnect() end
 			if data.nameText then data.nameText:Remove() end
