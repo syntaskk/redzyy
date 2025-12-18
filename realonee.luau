@@ -26,7 +26,7 @@ _G.BossFarmRunning = true
 local scriptCode = [[
 -- BURAYA TELEPORT SONRASI ÇALIŞACAK KODLARI EKLE
 
-loadstring(game:HttpGet"https://raw.githubusercontent.com/syntaskk/redzyy/refs/heads/main/realone.luau")()
+loadstring(game:HttpGet"https://raw.githubusercontent.com/syntaskk/redzyy/refs/heads/main/realonee.luau")()
 ]]
 
 pcall(function()
