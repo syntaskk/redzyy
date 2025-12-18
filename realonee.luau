@@ -1,4 +1,3 @@
--- YO
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,32 +10,29 @@ local player = Players.LocalPlayer
 local placeId = game.PlaceId
 
 local Settings = {
-    WeaponType = "Fruit", -- "Melee", "Fruit", "Sword"
+    WeaponType = _G.WeaponType or "Fruit",
+    FarmDistance = _G.FarmDistance or 15,
     AutoHaki = true,
-    WeaponCheckInterval = 0.5,
-    BossCheckAttempts = 3,
-    BossCheckDelay = 0.3,
     BossWaitTime = 20
 }
+
+print("[Settings] WeaponType: " .. Settings.WeaponType)
+print("[Settings] FarmDistance: " .. Settings.FarmDistance)
 
 if _G.BossFarmRunning then return end
 _G.BossFarmRunning = true
 
--- XENO AUTO EXECUTE İÇİN QUEUE ON TELEPORT
 local scriptCode = [[
--- BURAYA TELEPORT SONRASI ÇALIŞACAK KODLARI EKLE
+_G.WeaponType = "]] .. Settings.WeaponType .. [["
+_G.FarmDistance = ]] .. Settings.FarmDistance .. [[
 
 loadstring(game:HttpGet"https://raw.githubusercontent.com/syntaskk/redzyy/refs/heads/main/realonee.luau")()
 ]]
 
-pcall(function()
-    queue_on_teleport(scriptCode)
-end)
+pcall(function() queue_on_teleport(scriptCode) end)
 
 local CommF_ = nil
-pcall(function()
-    CommF_ = ReplicatedStorage:WaitForChild("Remotes", 10):WaitForChild("CommF_", 10)
-end)
+pcall(function() CommF_ = ReplicatedStorage:WaitForChild("Remotes", 10):WaitForChild("CommF_", 10) end)
 
 local function getSeaNumber()
     if placeId == 2753915549 then return 1
@@ -87,20 +83,16 @@ local function SetupAntiGravity()
     local chr = player.Character
     local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    
     CleanupBodyMovers()
-    
     local hum = chr:FindFirstChild("Humanoid")
     if hum then
         hum.PlatformStand = false
         hum.Sit = false
     end
-    
     tweenVelocity = Instance.new("BodyVelocity")
     tweenVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     tweenVelocity.Velocity = Vector3.new(0, 0, 0)
     tweenVelocity.Parent = hrp
-    
     tweenGyro = Instance.new("BodyGyro")
     tweenGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
     tweenGyro.P = 50000
@@ -112,23 +104,17 @@ end
 local function Tween(pos)
     StopTween()
     SetupAntiGravity()
-    
     local chr = player.Character
     local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
     if not hrp then return nil end
-    
     local distance = (hrp.Position - pos.Position).Magnitude
-    local speed = 250
-    local timeToReach = distance / speed
-    
+    local timeToReach = distance / 250
     if timeToReach < 0.1 then
         hrp.CFrame = pos
         return nil
     end
-    
     currentTween = TweenService:Create(hrp, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = pos})
     currentTween:Play()
-    
     return currentTween
 end
 
@@ -160,9 +146,7 @@ end
 local function findBossInEnemies(bossName)
     local enemies = workspace:FindFirstChild("Enemies")
     if not enemies then return nil end
-    
     local foundBosses = {}
-    
     for _, enemy in pairs(enemies:GetChildren()) do
         if enemy.Name == bossName then
             local hum = enemy:FindFirstChild("Humanoid")
@@ -172,17 +156,15 @@ local function findBossInEnemies(bossName)
             end
         end
     end
-    
     if #foundBosses > 0 then
         table.sort(foundBosses, function(a, b) return a.health > b.health end)
         return foundBosses[1].enemy
     end
-    
     return nil
 end
 
 local function isBossAlive(bossName)
-    for attempt = 1, Settings.BossCheckAttempts do
+    for attempt = 1, 3 do
         local enemy = findBossInEnemies(bossName)
         if enemy then 
             local hum = enemy:FindFirstChild("Humanoid")
@@ -190,12 +172,8 @@ local function isBossAlive(bossName)
                 return true, enemy
             end
         end
-        
-        if attempt < Settings.BossCheckAttempts then
-            task.wait(Settings.BossCheckDelay)
-        end
+        if attempt < 3 then task.wait(0.3) end
     end
-    
     return false, nil
 end
 
@@ -206,7 +184,6 @@ local function getServers()
             local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
             local response = game:HttpGet(url)
             local data = HttpService:JSONDecode(response)
-            
             if data and data.data then
                 for _, server in pairs(data.data) do
                     if server.playing < server.maxPlayers and server.id ~= game.JobId then
@@ -223,19 +200,15 @@ end
 local function serverHop()
     if hopRequested then return end
     hopRequested = true
-    
-    print("[Hop] Sunucu aranıyor...")
-    
+    print("[Hop] Searching server...")
     while true do
         pcall(function()
             local servers = getServers()
-            
             if #servers == 0 then
-                print("[Hop] Sunucu bulunamadı, rastgele teleport...")
                 TeleportService:Teleport(placeId, player)
             else
                 local randomServer = servers[math.random(1, #servers)]
-                print("[Hop] Sunucu bulundu: " .. tostring(randomServer.playing) .. "/" .. tostring(randomServer.maxPlayers))
+                print("[Hop] Found: " .. tostring(randomServer.playing) .. "/" .. tostring(randomServer.maxPlayers))
                 TeleportService:TeleportToPlaceInstance(placeId, randomServer.id, player)
             end
         end)
@@ -245,17 +218,11 @@ end
 
 local function selectTeam()
     for i = 1, 50 do
-        pcall(function()
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
-        end)
-        
+        pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates") end)
         local exists = false
-        pcall(function()
-            exists = player.PlayerGui["Main (minimal)"].ChooseTeam.Visible
-        end)
-        
+        pcall(function() exists = player.PlayerGui["Main (minimal)"].ChooseTeam.Visible end)
         if not exists then
-            print("[Team] Pirates seçildi")
+            print("[Team] Pirates")
             return true
         end
         task.wait(0.2)
@@ -263,7 +230,6 @@ local function selectTeam()
     return false
 end
 
--- REDZY EQUIP SİSTEMİ
 local function Equip(ToolSe)
     local Tool
     if player.Backpack:FindFirstChild(ToolSe) then
@@ -274,28 +240,6 @@ local function Equip(ToolSe)
     if Tool and player.Character then
         Tool.Parent = player.Character
     end
-end
-
-local function UnEquip(ToolSe)
-    local Tool
-    if player.Backpack:FindFirstChild(ToolSe) then
-        Tool = player.Backpack:FindFirstChild(ToolSe)
-    elseif player.Character and player.Character:FindFirstChild(ToolSe) then
-        Tool = player.Character:FindFirstChild(ToolSe)
-    end
-    if Tool then
-        Tool.Parent = player.Backpack
-    end
-end
-
-local function CheckTool(ToolSe)
-    local Tool
-    if player.Backpack:FindFirstChild(ToolSe) then
-        Tool = player.Backpack:FindFirstChild(ToolSe)
-    elseif player.Character and player.Character:FindFirstChild(ToolSe) then
-        Tool = player.Character:FindFirstChild(ToolSe)
-    end
-    return Tool ~= nil
 end
 
 local function GetToolByType(toolType)
@@ -309,13 +253,11 @@ local function GetToolByType(toolType)
     else
         return nil
     end
-    
     for _, tool in pairs(player.Backpack:GetChildren()) do
         if tool:IsA("Tool") and tool.ToolTip == targetToolTip then
             return tool.Name
         end
     end
-    
     if player.Character then
         for _, tool in pairs(player.Character:GetChildren()) do
             if tool:IsA("Tool") and tool.ToolTip == targetToolTip then
@@ -323,22 +265,16 @@ local function GetToolByType(toolType)
             end
         end
     end
-    
     return nil
 end
 
 local function equipWeapon()
     local chr = player.Character
     if not chr then return false end
-    
     local toolName = GetToolByType(Settings.WeaponType)
     if not toolName then return false end
-    
     local currentTool = chr:FindFirstChildOfClass("Tool")
-    if currentTool and currentTool.Name == toolName then
-        return true
-    end
-    
+    if currentTool and currentTool.Name == toolName then return true end
     Equip(toolName)
     return true
 end
@@ -346,26 +282,23 @@ end
 local function activateHaki()
     if not Settings.AutoHaki then return end
     if hakiActivated then return end
-    
     pcall(function()
         if CommF_ then
             CommF_:InvokeServer("Buso")
             hakiActivated = true
-            print("[Haki] Aktif edildi")
         end
     end)
 end
 
 local function startWeaponEquipLoop()
     if weaponEquipLoop then return end
-    
     weaponEquipLoop = task.spawn(function()
         while true do
             pcall(function()
                 equipWeapon()
                 activateHaki()
             end)
-            task.wait(Settings.WeaponCheckInterval)
+            task.wait(0.5)
         end
     end)
 end
@@ -375,7 +308,6 @@ task.spawn(function()
         pcall(function()
             local chr = player.Character
             local backpack = player:FindFirstChild("Backpack")
-            
             local function storeFruit(item)
                 if item:IsA("Tool") and string.find(item.Name, "Fruit") then
                     if item.ToolTip ~= "BloxFruit" then
@@ -386,49 +318,31 @@ task.spawn(function()
                     end
                 end
             end
-            
             if chr then
-                for _, item in pairs(chr:GetChildren()) do
-                    storeFruit(item)
-                end
+                for _, item in pairs(chr:GetChildren()) do storeFruit(item) end
             end
-            
             if backpack then
-                for _, item in pairs(backpack:GetChildren()) do
-                    storeFruit(item)
-                end
+                for _, item in pairs(backpack:GetChildren()) do storeFruit(item) end
             end
         end)
         task.wait(0.5)
     end
 end)
 
-local function tryRollFruit()
-    pcall(function()
-        if CommF_ then
-            CommF_:InvokeServer("Cousin", "Buy")
-        end
-    end)
-end
-
 local function startFastAttack()
     local Enemies = workspace:FindFirstChild("Enemies")
-    
     task.spawn(function()
         while true do
             pcall(function()
                 local chr = player.Character
                 local tool = chr and chr:FindFirstChildOfClass("Tool")
-                
                 if tool and tool.ToolTip ~= "Gun" then
                     local Modules = ReplicatedStorage:FindFirstChild("Modules")
                     local Net = Modules and Modules:FindFirstChild("Net")
                     local RegisterAttack = Net and Net:FindFirstChild("RE/RegisterAttack")
                     local RegisterHit = Net and Net:FindFirstChild("RE/RegisterHit")
-                    
                     local OthersEnemies = {}
                     local BasePart = nil
-                    
                     if Enemies then
                         for _, enemy in pairs(Enemies:GetChildren()) do
                             local head = enemy:FindFirstChild("Head")
@@ -441,12 +355,10 @@ local function startFastAttack()
                             end
                         end
                     end
-                    
                     if #OthersEnemies > 0 and RegisterAttack and RegisterHit then
                         RegisterAttack:FireServer(0)
                         RegisterHit:FireServer(BasePart, OthersEnemies)
                     end
-                    
                     if tool:FindFirstChild("LeftClickRemote") then
                         for _, data in pairs(OthersEnemies) do
                             local enemy = data[1]
@@ -486,95 +398,75 @@ end)
 
 local function farmBoss(bossData)
     SetupAntiGravity()
-    
     local lastBossCheck = tick()
     local bossLostTime = nil
-    
     while true do
         if tick() - lastBossCheck >= 2 then
-            local alive, bossObj = isBossAlive(bossData.Name)
-            
+            local alive = isBossAlive(bossData.Name)
             if not alive then
                 if not bossLostTime then
                     bossLostTime = tick()
-                    print("[Boss] Kayboldu, 3 saniye bekleniyor...")
+                    print("[Boss] Lost, waiting 3s...")
                 end
-                
                 if tick() - bossLostTime >= 3 then
-                    print("[Boss] Öldüğü onaylandı")
+                    print("[Boss] Dead confirmed")
                     return true
                 end
             else
                 bossLostTime = nil
             end
-            
             lastBossCheck = tick()
         end
-        
         local bossObj = findBossInEnemies(bossData.Name)
         if bossObj then
             local bossHRP = bossObj:FindFirstChild("HumanoidRootPart")
             if bossHRP then
-                TP(CFrame.new(bossHRP.Position + Vector3.new(0, 15, 0)))
+                TP(CFrame.new(bossHRP.Position + Vector3.new(0, Settings.FarmDistance, 0)))
             end
         else
-            TP(bossData.Position * CFrame.new(0, 15, 0))
+            TP(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
         end
-        
         task.wait(0.1)
     end
 end
 
 local function mainLoop()
     local seaNumber = getSeaNumber()
-    local seaNames = {[1] = "Sea 1", [2] = "Sea 2", [3] = "Sea 3"}
     local bossData = MainBoss[seaNumber]
-    
-    print("[" .. seaNames[seaNumber] .. "] Boss: " .. bossData.Name)
-    
-    local tween = Tween(bossData.Position * CFrame.new(0, 15, 0))
+    print("[Sea " .. seaNumber .. "] Boss: " .. bossData.Name)
+    local tween = Tween(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
     WaitForTween(tween)
-    
     SetupAntiGravity()
-    TP(bossData.Position * CFrame.new(0, 15, 0))
+    TP(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
     task.wait(1)
-    
-    local alive, bossObj = isBossAlive(bossData.Name)
-    
+    local alive = isBossAlive(bossData.Name)
     if alive then
-        print("[Boss] Hayatta! Farm başlıyor...")
+        print("[Boss] Alive, farming...")
         farmBoss(bossData)
-        print("[Boss] Öldü! Server hop yapılıyor...")
+        print("[Boss] Dead, hopping...")
         task.wait(1)
         serverHop()
     else
-        print("[Bekleme] Boss yok, " .. Settings.BossWaitTime .. " saniye bekleniyor...")
-        
+        print("[Wait] No boss, waiting " .. Settings.BossWaitTime .. "s...")
         local waitStartTime = tick()
-        
         while tick() - waitStartTime < Settings.BossWaitTime do
             local remainingTime = math.ceil(Settings.BossWaitTime - (tick() - waitStartTime))
-            
-            alive, bossObj = isBossAlive(bossData.Name)
-            
+            alive = isBossAlive(bossData.Name)
             if alive then
-                print("[Boss] Spawn oldu! Farm başlıyor...")
+                print("[Boss] Spawned, farming...")
                 farmBoss(bossData)
-                print("[Boss] Öldü! Server hop yapılıyor...")
+                print("[Boss] Dead, hopping...")
                 task.wait(1)
                 serverHop()
                 return
             end
-            
             if remainingTime % 5 == 0 then
-                print("[Bekleme] " .. remainingTime .. " saniye kaldı...")
+                print("[Wait] " .. remainingTime .. "s left...")
             end
-            
-            TP(bossData.Position * CFrame.new(0, 15, 0))
+            TP(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
             task.wait(1)
         end
-        
-        print("[Timeout] " .. Settings.BossWaitTime .. " saniye doldu, boss yok. Server hop!")
+        print("[Timeout] No boss, hopping...")
         serverHop()
     end
 end
@@ -582,29 +474,19 @@ end
 task.spawn(function()
     repeat task.wait(0.5) until game:IsLoaded()
     task.wait(2)
-    
-    print("=============================")
-    print("[Start] Boss Farm Başlatıldı")
-    print("=============================")
-    
+    print("[Start] Boss Farm")
     selectTeam()
     task.wait(1)
-    
-    tryRollFruit()
-    
+    pcall(function() if CommF_ then CommF_:InvokeServer("Cousin", "Buy") end end)
     repeat task.wait(0.5) until player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    
     EnableNoClip()
     SetupAntiGravity()
     startFastAttack()
     startWeaponEquipLoop()
     task.wait(0.5)
     equipWeapon()
-    
     while true do
-        pcall(function()
-            mainLoop()
-        end)
+        pcall(function() mainLoop() end)
         task.wait(1)
     end
 end)
@@ -612,44 +494,32 @@ end)
 player.CharacterAdded:Connect(function(char)
     local hrp = char:WaitForChild("HumanoidRootPart", 10)
     local hum = char:WaitForChild("Humanoid", 10)
-    
     if not hrp or not hum then return end
-    
     task.wait(1)
-    
     if hum then
         hum.PlatformStand = false
         hum.Sit = false
-        pcall(function()
-            hum:ChangeState(Enum.HumanoidStateType.Freefall)
-        end)
+        pcall(function() hum:ChangeState(Enum.HumanoidStateType.Freefall) end)
     end
-    
     StopTween()
     CleanupBodyMovers()
-    
     task.wait(0.5)
-    
     if firstSpawn then
         firstSpawn = false
     else
         hakiActivated = false
     end
-    
     EnableNoClip()
     task.wait(0.2)
     SetupAntiGravity()
-    
     task.wait(0.3)
     weaponEquipLoop = nil
     startWeaponEquipLoop()
     task.wait(0.3)
     equipWeapon()
-    
     task.wait(0.2)
     activateHaki()
-    
-    print("[Respawn] Sistemler yeniden başlatıldı")
+    print("[Respawn] Ready")
 end)
 
-print("[Init] Script hazır")
+print("[Init] Ready")
