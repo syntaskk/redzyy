@@ -10,7 +10,7 @@ local player = Players.LocalPlayer
 local placeId = game.PlaceId
 
 local Settings = {
-    WeaponType = _G.WeaponType or "Fruit",
+    WeaponType = _G.WeaponType or "Melee",
     FarmDistance = _G.FarmDistance or 15,
     AutoHaki = true,
     BossWaitTime = 20
@@ -26,7 +26,7 @@ local scriptCode = [[
 _G.WeaponType = "]] .. Settings.WeaponType .. [["
 _G.FarmDistance = ]] .. Settings.FarmDistance .. [[
 
-loadstring(game:HttpGet"https://raw.githubusercontent.com/syntaskk/redzyy/refs/heads/main/realoneee.luau")()
+loadstring(game:HttpGet"https://raw.githubusercontent.com/syntaskk/redzyy/refs/heads/main/realoneeee.luau")()
 ]]
 
 pcall(function() queue_on_teleport(scriptCode) end)
@@ -48,29 +48,12 @@ local MainBoss = {
 }
 
 local noClipConnection = nil
+local antiGravityConnection = nil
 local currentTween = nil
-local tweenGyro = nil
-local tweenVelocity = nil
 local hakiActivated = false
 local hopRequested = false
 local firstSpawn = true
 local weaponEquipLoop = nil
-
-local function CleanupBodyMovers()
-    local chr = player.Character
-    if chr then
-        local hrp = chr:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            for _, obj in pairs(hrp:GetChildren()) do
-                if obj:IsA("BodyVelocity") or obj:IsA("BodyGyro") then
-                    obj:Destroy()
-                end
-            end
-        end
-    end
-    tweenGyro = nil
-    tweenVelocity = nil
-end
 
 local function StopTween()
     if currentTween then
@@ -79,31 +62,59 @@ local function StopTween()
     end
 end
 
-local function SetupAntiGravity()
-    local chr = player.Character
-    local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    CleanupBodyMovers()
-    local hum = chr:FindFirstChild("Humanoid")
-    if hum then
-        hum.PlatformStand = false
-        hum.Sit = false
-    end
-    tweenVelocity = Instance.new("BodyVelocity")
-    tweenVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    tweenVelocity.Velocity = Vector3.new(0, 0, 0)
-    tweenVelocity.Parent = hrp
-    tweenGyro = Instance.new("BodyGyro")
-    tweenGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    tweenGyro.P = 50000
-    tweenGyro.D = 1000
-    tweenGyro.CFrame = hrp.CFrame
-    tweenGyro.Parent = hrp
+local function EnableNoClip()
+    if noClipConnection then return end
+    noClipConnection = RunService.Stepped:Connect(function()
+        local chr = player.Character
+        if chr then
+            for _, part in pairs(chr:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+end
+
+local function EnableAntiGravity()
+    if antiGravityConnection then return end
+    antiGravityConnection = RunService.Heartbeat:Connect(function()
+        local chr = player.Character
+        if not chr then return end
+        local hrp = chr:FindFirstChild("HumanoidRootPart")
+        local hum = chr:FindFirstChild("Humanoid")
+        if not hrp then return end
+        
+        if hum then
+            hum.PlatformStand = false
+            hum.Sit = false
+        end
+        
+        local bv = hrp:FindFirstChild("FarmBodyVelocity")
+        if not bv then
+            bv = Instance.new("BodyVelocity")
+            bv.Name = "FarmBodyVelocity"
+            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bv.Velocity = Vector3.new(0, 0, 0)
+            bv.Parent = hrp
+        end
+        bv.Velocity = Vector3.new(0, 0, 0)
+        
+        local bg = hrp:FindFirstChild("FarmBodyGyro")
+        if not bg then
+            bg = Instance.new("BodyGyro")
+            bg.Name = "FarmBodyGyro"
+            bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            bg.P = 50000
+            bg.D = 1000
+            bg.Parent = hrp
+        end
+        bg.CFrame = hrp.CFrame
+    end)
 end
 
 local function Tween(pos)
     StopTween()
-    SetupAntiGravity()
     local chr = player.Character
     local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
     if not hrp then return nil end
@@ -121,20 +132,6 @@ end
 local function WaitForTween(tween)
     if not tween then return end
     repeat task.wait(0.1) until tween.PlaybackState ~= Enum.PlaybackState.Playing
-end
-
-local function EnableNoClip()
-    if noClipConnection then return end
-    noClipConnection = RunService.Stepped:Connect(function()
-        local chr = player.Character
-        if chr then
-            for _, part in pairs(chr:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
-    end)
 end
 
 local function TP(pos)
@@ -397,7 +394,6 @@ player.Idled:Connect(function()
 end)
 
 local function farmBoss(bossData)
-    SetupAntiGravity()
     local lastBossCheck = tick()
     local bossLostTime = nil
     while true do
@@ -436,7 +432,6 @@ local function mainLoop()
     print("[Sea " .. seaNumber .. "] Boss: " .. bossData.Name)
     local tween = Tween(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
     WaitForTween(tween)
-    SetupAntiGravity()
     TP(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
     task.wait(1)
     local alive = isBossAlive(bossData.Name)
@@ -480,7 +475,7 @@ task.spawn(function()
     pcall(function() if CommF_ then CommF_:InvokeServer("Cousin", "Buy") end end)
     repeat task.wait(0.5) until player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     EnableNoClip()
-    SetupAntiGravity()
+    EnableAntiGravity()
     startFastAttack()
     startWeaponEquipLoop()
     task.wait(0.5)
@@ -502,7 +497,6 @@ player.CharacterAdded:Connect(function(char)
         pcall(function() hum:ChangeState(Enum.HumanoidStateType.Freefall) end)
     end
     StopTween()
-    CleanupBodyMovers()
     task.wait(0.5)
     if firstSpawn then
         firstSpawn = false
@@ -510,8 +504,7 @@ player.CharacterAdded:Connect(function(char)
         hakiActivated = false
     end
     EnableNoClip()
-    task.wait(0.2)
-    SetupAntiGravity()
+    EnableAntiGravity()
     task.wait(0.3)
     weaponEquipLoop = nil
     startWeaponEquipLoop()
