@@ -26,7 +26,7 @@ local scriptCode = [[
 _G.WeaponType = "]] .. Settings.WeaponType .. [["
 _G.FarmDistance = ]] .. Settings.FarmDistance .. [[
 
-loadstring(game:HttpGet"https://raw.githubusercontent.com/syntaskk/redzyy/refs/heads/main/realonee.luau")()
+loadstring(game:HttpGet"https://raw.githubusercontent.com/syntaskk/redzyy/refs/heads/main/realoneee.luau")()
 ]]
 
 pcall(function() queue_on_teleport(scriptCode) end)
