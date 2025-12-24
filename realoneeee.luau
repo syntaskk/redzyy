@@ -36,8 +36,8 @@ pcall(function() CommF_ = ReplicatedStorage:WaitForChild("Remotes", 10):WaitForC
 
 local function getSeaNumber()
     if placeId == 2753915549 then return 1
-    elseif placeId == 4442272183 then return 2
-    elseif placeId == 7449423635 then return 3 end
+    elseif placeId == 79091703265657 then return 2
+    elseif placeId == 100117331123089 then return 3 end
     return 1
 end
 
@@ -50,7 +50,6 @@ local MainBoss = {
 local noClipConnection = nil
 local antiGravityConnection = nil
 local currentTween = nil
-local hakiActivated = false
 local hopRequested = false
 local firstSpawn = true
 local weaponEquipLoop = nil
@@ -227,18 +226,6 @@ local function selectTeam()
     return false
 end
 
-local function Equip(ToolSe)
-    local Tool
-    if player.Backpack:FindFirstChild(ToolSe) then
-        Tool = player.Backpack:FindFirstChild(ToolSe)
-    elseif player.Character and player.Character:FindFirstChild(ToolSe) then
-        Tool = player.Character:FindFirstChild(ToolSe)
-    end
-    if Tool and player.Character then
-        Tool.Parent = player.Character
-    end
-end
-
 local function GetToolByType(toolType)
     local targetToolTip
     if toolType == "Melee" then
@@ -252,13 +239,13 @@ local function GetToolByType(toolType)
     end
     for _, tool in pairs(player.Backpack:GetChildren()) do
         if tool:IsA("Tool") and tool.ToolTip == targetToolTip then
-            return tool.Name
+            return tool
         end
     end
     if player.Character then
         for _, tool in pairs(player.Character:GetChildren()) do
             if tool:IsA("Tool") and tool.ToolTip == targetToolTip then
-                return tool.Name
+                return tool
             end
         end
     end
@@ -267,22 +254,21 @@ end
 
 local function equipWeapon()
     local chr = player.Character
-    if not chr then return false end
-    local toolName = GetToolByType(Settings.WeaponType)
-    if not toolName then return false end
-    local currentTool = chr:FindFirstChildOfClass("Tool")
-    if currentTool and currentTool.Name == toolName then return true end
-    Equip(toolName)
-    return true
+    if not chr then return end
+    local tool = GetToolByType(Settings.WeaponType)
+    if tool and tool.Parent ~= chr then
+        tool.Parent = chr
+    end
 end
 
-local function activateHaki()
+local function AutoHaki()
     if not Settings.AutoHaki then return end
-    if hakiActivated then return end
     pcall(function()
-        if CommF_ then
-            CommF_:InvokeServer("Buso")
-            hakiActivated = true
+        local chr = player.Character
+        if chr and not chr:FindFirstChild("HasBuso") then
+            if CommF_ then
+                CommF_:InvokeServer("Buso")
+            end
         end
     end)
 end
@@ -293,7 +279,7 @@ local function startWeaponEquipLoop()
         while true do
             pcall(function()
                 equipWeapon()
-                activateHaki()
+                AutoHaki()
             end)
             task.wait(0.5)
         end
@@ -500,8 +486,6 @@ player.CharacterAdded:Connect(function(char)
     task.wait(0.5)
     if firstSpawn then
         firstSpawn = false
-    else
-        hakiActivated = false
     end
     EnableNoClip()
     EnableAntiGravity()
@@ -511,7 +495,7 @@ player.CharacterAdded:Connect(function(char)
     task.wait(0.3)
     equipWeapon()
     task.wait(0.2)
-    activateHaki()
+    AutoHaki()
     print("[Respawn] Ready")
 end)
 
