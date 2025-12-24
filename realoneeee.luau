@@ -231,7 +231,7 @@ local function GetToolByType(toolType)
     if toolType == "Melee" then
         targetToolTip = "Melee"
     elseif toolType == "Fruit" then
-        targetToolTip = "BloxFruit"
+        targetToolTip = "Blox Fruit"  -- BOŞLUKLU
     elseif toolType == "Sword" then
         targetToolTip = "Sword"
     else
@@ -250,7 +250,7 @@ local function GetToolByType(toolType)
         end
     end
     return nil
-end
+end 
 
 local function equipWeapon()
     local chr = player.Character
