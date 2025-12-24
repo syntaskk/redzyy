@@ -1,2 +1,3 @@
-irapenigggers
-ooomylovelyteacher
+welovewyntaskk
+imnewtomakingscripts
+emirhankoyuncu
