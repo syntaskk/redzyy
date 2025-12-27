@@ -13,7 +13,8 @@ local Settings = {
     WeaponType = _G.WeaponType or "Melee",
     FarmDistance = _G.FarmDistance or 15,
     AutoHaki = true,
-    BossWaitTime = 20
+    BossWaitTime = 20,
+    TweenSpeed = 340
 }
 
 print("[Settings] WeaponType: " .. Settings.WeaponType)
@@ -41,10 +42,31 @@ local function getSeaNumber()
     return 1
 end
 
+-- ═══════════════════════════════════════════════════════════
+-- BOSS VE QUEST VERİLERİ (DOĞRU BİLGİLER)
+-- ═══════════════════════════════════════════════════════════
 local MainBoss = {
-    [1] = {Name = "Cyborg", Position = CFrame.new(6138, 10, 3939)},
-    [2] = {Name = "Tide Keeper", Position = CFrame.new(-3711, 77, -11469)},
-    [3] = {Name = "Cake Queen", Position = CFrame.new(-710, 382, -11150)}
+    [1] = {
+        Name = "Cyborg",
+        Position = CFrame.new(6094.0249023438, 73.770050048828, 3825.7348632813),
+        QuestName = "FountainQuest",
+        QuestLevel = 3,
+        QuestNPC = CFrame.new(5258.2788085938, 38.526931762695, 4050.044921875)
+    },
+    [2] = {
+        Name = "Tide Keeper",
+        Position = CFrame.new(-3795.6423339844, 105.88877105713, -11421.307617188),
+        QuestName = "ForgottenQuest",
+        QuestLevel = 3,
+        QuestNPC = CFrame.new(-3053.9814453125, 237.18954467773, -10145.0390625)
+    },
+    [3] = {
+        Name = "Cake Queen",
+        Position = CFrame.new(-678.648804, 381.353943, -11114.2012),
+        QuestName = "IceCreamIslandQuest",
+        QuestLevel = 3,
+        QuestNPC = CFrame.new(-819.376709, 64.9259796, -10967.2832)
+    }
 }
 
 local noClipConnection = nil
@@ -118,7 +140,7 @@ local function Tween(pos)
     local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
     if not hrp then return nil end
     local distance = (hrp.Position - pos.Position).Magnitude
-    local timeToReach = distance / 250
+    local timeToReach = distance / Settings.TweenSpeed
     if timeToReach < 0.1 then
         hrp.CFrame = pos
         return nil
@@ -172,6 +194,88 @@ local function isBossAlive(bossName)
     end
     return false, nil
 end
+
+-- ═══════════════════════════════════════════════════════════
+-- QUEST SİSTEMİ
+-- ═══════════════════════════════════════════════════════════
+
+local function HasBossQuest(bossData)
+    local success, result = pcall(function()
+        local gui = player.PlayerGui:FindFirstChild("Main")
+        if not gui then return false end
+        
+        local quest = gui:FindFirstChild("Quest")
+        if not quest or not quest.Visible then return false end
+        
+        local container = quest:FindFirstChild("Container")
+        if not container then return false end
+        
+        local questTitle = container:FindFirstChild("QuestTitle")
+        if not questTitle then return false end
+        
+        local title = questTitle:FindFirstChild("Title") 
+                    or questTitle:FindFirstChild("TextLabel") 
+                    or questTitle
+        
+        local text = title and title.Text or ""
+        return text ~= "" and string.find(text, bossData.Name) ~= nil
+    end)
+    return success and result
+end
+
+local function AbandonQuest()
+    pcall(function()
+        if CommF_ then
+            CommF_:InvokeServer("AbandonQuest")
+        end
+    end)
+end
+
+local function GetBossQuest(bossData)
+    if HasBossQuest(bossData) then
+        print("[Quest] Already have " .. bossData.Name .. " quest")
+        return true
+    end
+    
+    print("[Quest] Getting " .. bossData.Name .. " quest...")
+    
+    AbandonQuest()
+    task.wait(0.3)
+    
+    local chr = player.Character
+    local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    local distanceToNPC = (hrp.Position - bossData.QuestNPC.Position).Magnitude
+    
+    if distanceToNPC > 15 then
+        print("[Quest] Traveling to Quest NPC...")
+        local tween = Tween(bossData.QuestNPC)
+        WaitForTween(tween)
+        TP(bossData.QuestNPC)
+        task.wait(0.5)
+    end
+    
+    for attempt = 1, 10 do
+        pcall(function()
+            if CommF_ then
+                CommF_:InvokeServer("StartQuest", bossData.QuestName, bossData.QuestLevel)
+            end
+        end)
+        
+        task.wait(0.5)
+        
+        if HasBossQuest(bossData) then
+            print("[Quest] " .. bossData.Name .. " quest obtained!")
+            return true
+        end
+    end
+    
+    print("[Quest] Failed to get quest, continuing...")
+    return false
+end
+
+-- ═══════════════════════════════════════════════════════════
 
 local function getServers()
     local servers = {}
@@ -231,7 +335,7 @@ local function GetToolByType(toolType)
     if toolType == "Melee" then
         targetToolTip = "Melee"
     elseif toolType == "Fruit" then
-        targetToolTip = "Blox Fruit"  -- BOŞLUKLU
+        targetToolTip = "Blox Fruit"
     elseif toolType == "Sword" then
         targetToolTip = "Sword"
     else
@@ -313,7 +417,6 @@ task.spawn(function()
 end)
 
 local function startFastAttack()
-    local Enemies = workspace:FindFirstChild("Enemies")
     task.spawn(function()
         while true do
             pcall(function()
@@ -326,6 +429,7 @@ local function startFastAttack()
                     local RegisterHit = Net and Net:FindFirstChild("RE/RegisterHit")
                     local OthersEnemies = {}
                     local BasePart = nil
+                    local Enemies = workspace:FindFirstChild("Enemies")
                     if Enemies then
                         for _, enemy in pairs(Enemies:GetChildren()) do
                             local head = enemy:FindFirstChild("Head")
@@ -412,14 +516,26 @@ local function farmBoss(bossData)
     end
 end
 
+-- ═══════════════════════════════════════════════════════════
+-- ANA DÖNGÜ
+-- ═══════════════════════════════════════════════════════════
 local function mainLoop()
     local seaNumber = getSeaNumber()
     local bossData = MainBoss[seaNumber]
     print("[Sea " .. seaNumber .. "] Boss: " .. bossData.Name)
+    
+    -- ★ ÖNCE QUEST AL ★
+    print("[Quest] Checking quest for " .. bossData.Name .. "...")
+    GetBossQuest(bossData)
+    task.wait(0.5)
+    
+    -- Boss pozisyonuna git
+    print("[Boss] Traveling to " .. bossData.Name .. "...")
     local tween = Tween(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
     WaitForTween(tween)
     TP(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
     task.wait(1)
+    
     local alive = isBossAlive(bossData.Name)
     if alive then
         print("[Boss] Alive, farming...")
@@ -434,6 +550,11 @@ local function mainLoop()
             local remainingTime = math.ceil(Settings.BossWaitTime - (tick() - waitStartTime))
             alive = isBossAlive(bossData.Name)
             if alive then
+                if not HasBossQuest(bossData) then
+                    print("[Quest] Boss spawned, getting quest first...")
+                    GetBossQuest(bossData)
+                end
+                
                 print("[Boss] Spawned, farming...")
                 farmBoss(bossData)
                 print("[Boss] Dead, hopping...")
@@ -455,7 +576,7 @@ end
 task.spawn(function()
     repeat task.wait(0.5) until game:IsLoaded()
     task.wait(2)
-    print("[Start] Boss Farm")
+    print("[Start] Boss Farm + Quest System")
     selectTeam()
     task.wait(1)
     pcall(function() if CommF_ then CommF_:InvokeServer("Cousin", "Buy") end end)
@@ -499,4 +620,4 @@ player.CharacterAdded:Connect(function(char)
     print("[Respawn] Ready")
 end)
 
-print("[Init] Ready")
+print("[Init] Boss Farm + Quest System Ready")
