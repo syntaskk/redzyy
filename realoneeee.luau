@@ -42,9 +42,6 @@ local function getSeaNumber()
     return 1
 end
 
--- ═══════════════════════════════════════════════════════════
--- BOSS VE QUEST VERİLERİ (DOĞRU BİLGİLER)
--- ═══════════════════════════════════════════════════════════
 local MainBoss = {
     [1] = {
         Name = "Cyborg",
@@ -75,6 +72,23 @@ local currentTween = nil
 local hopRequested = false
 local firstSpawn = true
 local weaponEquipLoop = nil
+
+local function ParseWeaponTypes()
+    local types = {}
+    for t in string.gmatch(Settings.WeaponType, "[^,]+") do
+        local trimmed = t:match("^%s*(.-)%s*$")
+        if trimmed and trimmed ~= "" then
+            table.insert(types, trimmed)
+        end
+    end
+    if #types == 0 then table.insert(types, "Melee") end
+    return types
+end
+
+local function GetRandomWeaponType()
+    local types = ParseWeaponTypes()
+    return types[math.random(1, #types)]
+end
 
 local function StopTween()
     if currentTween then
@@ -195,28 +209,17 @@ local function isBossAlive(bossName)
     return false, nil
 end
 
--- ═══════════════════════════════════════════════════════════
--- QUEST SİSTEMİ
--- ═══════════════════════════════════════════════════════════
-
 local function HasBossQuest(bossData)
     local success, result = pcall(function()
         local gui = player.PlayerGui:FindFirstChild("Main")
         if not gui then return false end
-        
         local quest = gui:FindFirstChild("Quest")
         if not quest or not quest.Visible then return false end
-        
         local container = quest:FindFirstChild("Container")
         if not container then return false end
-        
         local questTitle = container:FindFirstChild("QuestTitle")
         if not questTitle then return false end
-        
-        local title = questTitle:FindFirstChild("Title") 
-                    or questTitle:FindFirstChild("TextLabel") 
-                    or questTitle
-        
+        local title = questTitle:FindFirstChild("Title") or questTitle:FindFirstChild("TextLabel") or questTitle
         local text = title and title.Text or ""
         return text ~= "" and string.find(text, bossData.Name) ~= nil
     end)
@@ -233,12 +236,11 @@ end
 
 local function GetBossQuest(bossData)
     if HasBossQuest(bossData) then
-        print("[Quest] Already have " .. bossData.Name .. " quest")
+        print("[Quest] Have " .. bossData.Name)
         return true
     end
     
-    print("[Quest] Getting " .. bossData.Name .. " quest...")
-    
+    print("[Quest] Getting " .. bossData.Name)
     AbandonQuest()
     task.wait(0.3)
     
@@ -249,7 +251,7 @@ local function GetBossQuest(bossData)
     local distanceToNPC = (hrp.Position - bossData.QuestNPC.Position).Magnitude
     
     if distanceToNPC > 15 then
-        print("[Quest] Traveling to Quest NPC...")
+        print("[Quest] Going to NPC")
         local tween = Tween(bossData.QuestNPC)
         WaitForTween(tween)
         TP(bossData.QuestNPC)
@@ -262,20 +264,16 @@ local function GetBossQuest(bossData)
                 CommF_:InvokeServer("StartQuest", bossData.QuestName, bossData.QuestLevel)
             end
         end)
-        
         task.wait(0.5)
-        
         if HasBossQuest(bossData) then
-            print("[Quest] " .. bossData.Name .. " quest obtained!")
+            print("[Quest] Got " .. bossData.Name)
             return true
         end
     end
     
-    print("[Quest] Failed to get quest, continuing...")
+    print("[Quest] Failed")
     return false
 end
-
--- ═══════════════════════════════════════════════════════════
 
 local function getServers()
     local servers = {}
@@ -300,7 +298,7 @@ end
 local function serverHop()
     if hopRequested then return end
     hopRequested = true
-    print("[Hop] Searching server...")
+    print("[Hop] Searching")
     while true do
         pcall(function()
             local servers = getServers()
@@ -308,7 +306,7 @@ local function serverHop()
                 TeleportService:Teleport(placeId, player)
             else
                 local randomServer = servers[math.random(1, #servers)]
-                print("[Hop] Found: " .. tostring(randomServer.playing) .. "/" .. tostring(randomServer.maxPlayers))
+                print("[Hop] " .. tostring(randomServer.playing) .. "/" .. tostring(randomServer.maxPlayers))
                 TeleportService:TeleportToPlaceInstance(placeId, randomServer.id, player)
             end
         end)
@@ -359,7 +357,8 @@ end
 local function equipWeapon()
     local chr = player.Character
     if not chr then return end
-    local tool = GetToolByType(Settings.WeaponType)
+    local selectedType = GetRandomWeaponType()
+    local tool = GetToolByType(selectedType)
     if tool and tool.Parent ~= chr then
         tool.Parent = chr
     end
@@ -492,10 +491,8 @@ local function farmBoss(bossData)
             if not alive then
                 if not bossLostTime then
                     bossLostTime = tick()
-                    print("[Boss] Lost, waiting 3s...")
                 end
                 if tick() - bossLostTime >= 3 then
-                    print("[Boss] Dead confirmed")
                     return true
                 end
             else
@@ -516,21 +513,16 @@ local function farmBoss(bossData)
     end
 end
 
--- ═══════════════════════════════════════════════════════════
--- ANA DÖNGÜ
--- ═══════════════════════════════════════════════════════════
 local function mainLoop()
     local seaNumber = getSeaNumber()
     local bossData = MainBoss[seaNumber]
-    print("[Sea " .. seaNumber .. "] Boss: " .. bossData.Name)
+    print("[Sea " .. seaNumber .. "] " .. bossData.Name)
     
-    -- ★ ÖNCE QUEST AL ★
-    print("[Quest] Checking quest for " .. bossData.Name .. "...")
+    print("[Quest] Checking")
     GetBossQuest(bossData)
     task.wait(0.5)
     
-    -- Boss pozisyonuna git
-    print("[Boss] Traveling to " .. bossData.Name .. "...")
+    print("[Boss] Going")
     local tween = Tween(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
     WaitForTween(tween)
     TP(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
@@ -538,37 +530,35 @@ local function mainLoop()
     
     local alive = isBossAlive(bossData.Name)
     if alive then
-        print("[Boss] Alive, farming...")
+        print("[Boss] Farming")
         farmBoss(bossData)
-        print("[Boss] Dead, hopping...")
+        print("[Boss] Dead, hop")
         task.wait(1)
         serverHop()
     else
-        print("[Wait] No boss, waiting " .. Settings.BossWaitTime .. "s...")
+        print("[Wait] " .. Settings.BossWaitTime .. "s")
         local waitStartTime = tick()
         while tick() - waitStartTime < Settings.BossWaitTime do
             local remainingTime = math.ceil(Settings.BossWaitTime - (tick() - waitStartTime))
             alive = isBossAlive(bossData.Name)
             if alive then
                 if not HasBossQuest(bossData) then
-                    print("[Quest] Boss spawned, getting quest first...")
                     GetBossQuest(bossData)
                 end
-                
-                print("[Boss] Spawned, farming...")
+                print("[Boss] Farming")
                 farmBoss(bossData)
-                print("[Boss] Dead, hopping...")
+                print("[Boss] Dead, hop")
                 task.wait(1)
                 serverHop()
                 return
             end
             if remainingTime % 5 == 0 then
-                print("[Wait] " .. remainingTime .. "s left...")
+                print("[Wait] " .. remainingTime .. "s")
             end
             TP(bossData.Position * CFrame.new(0, Settings.FarmDistance, 0))
             task.wait(1)
         end
-        print("[Timeout] No boss, hopping...")
+        print("[Timeout] hop")
         serverHop()
     end
 end
@@ -576,7 +566,7 @@ end
 task.spawn(function()
     repeat task.wait(0.5) until game:IsLoaded()
     task.wait(2)
-    print("[Start] Boss Farm + Quest System")
+    print("[Start] Boss Farm")
     selectTeam()
     task.wait(1)
     pcall(function() if CommF_ then CommF_:InvokeServer("Cousin", "Buy") end end)
@@ -620,4 +610,4 @@ player.CharacterAdded:Connect(function(char)
     print("[Respawn] Ready")
 end)
 
-print("[Init] Boss Farm + Quest System Ready")
+print("[Init] Ready")
