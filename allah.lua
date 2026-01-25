@@ -1,422 +1,676 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
+local placeId = game.PlaceId
+local speed = 340
 
-local function initializeAllahMod()
-    local char = player.Character or player.CharacterAdded:Wait()
-    local humanoid = char:WaitForChild("Humanoid")
-    
-    local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-    gui.Name = "AllahMod"
-    gui.ResetOnSpawn = false
-    
-    local ALLAH_MOD_ENABLED = false
-    local speed = 350
-    local defaultSpeed = 16
-    local Number = math.random(1, 1000000)
-    
-    local renderConnection = nil
-    local autoAttackConnection = nil
-    local fruitEspLoop = nil
-    local espConnections = {}
-    
-    local mainFrame = Instance.new("Frame", gui)
-    mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 180, 0, 80)
-    mainFrame.Position = UDim2.new(0.5, -90, 0.1, 0)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    mainFrame.BorderSizePixel = 0
-    Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
-    
-    local title = Instance.new("TextLabel", mainFrame)
-    title.Name = "Title"
-    title.Size = UDim2.new(1, 0, 0, 25)
-    title.BackgroundTransparency = 1
-    title.Text = "Allah Mod"
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.TextSize = 16
-    title.Font = Enum.Font.GothamBold
-    
-    local toggleButton = Instance.new("TextButton", mainFrame)
-    toggleButton.Name = "ToggleButton"
-    toggleButton.Size = UDim2.new(0.85, 0, 0, 30)
-    toggleButton.Position = UDim2.new(0.075, 0, 0, 28)
-    toggleButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
-    toggleButton.BorderSizePixel = 0
-    toggleButton.Text = "OFF"
-    toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggleButton.TextSize = 16
-    toggleButton.Font = Enum.Font.GothamBold
-    Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 6)
-    
-    local fruitLabel = Instance.new("TextLabel", mainFrame)
-    fruitLabel.Name = "FruitLabel"
-    fruitLabel.Size = UDim2.new(1, 0, 0, 18)
-    fruitLabel.Position = UDim2.new(0, 0, 1, -20)
-    fruitLabel.BackgroundTransparency = 1
-    fruitLabel.Text = "Fruit in Server: 0"
-    fruitLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    fruitLabel.TextSize = 11
-    fruitLabel.Font = Enum.Font.Gotham
-    
-    -- Sürüklenebilir
-    local dragging = false
-    local dragInput, mousePos, framePos
-    
-    mainFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            mousePos = input.Position
-            framePos = mainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-    
-    mainFrame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            dragInput = input
-        end
-    end)
-    
-    UIS.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - mousePos
-            mainFrame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
-        end
-    end)
-    
-    -- Fruit Sayacı (Her zaman çalışır)
-    task.spawn(function()
-        while gui and gui.Parent do
-            local fruitCount = 0
-            for _, v in pairs(workspace:GetChildren()) do
-                if v.Name ~= "Blox Fruit Dealer" and string.find(v.Name, "Fruit") and v:IsA("Model") then
-                    fruitCount = fruitCount + 1
-                end
-            end
-            fruitLabel.Text = "Fruit in Server: " .. fruitCount
-            task.wait(1)
-        end
-    end)
-    
-    -- Yardımcı Fonksiyon
-    local function Round(num)
-        return math.floor(tonumber(num) + 0.5)
-    end
-    
-    -- Fruit ESP
-    local function UpdateFruitEsp()
-        for _, v in pairs(workspace:GetChildren()) do
-            pcall(function()
-                if string.find(v.Name, "Fruit") and v:FindFirstChild("Handle") then
-                    if not v.Handle:FindFirstChild("NameEsp" .. Number) then
-                        local bill = Instance.new("BillboardGui", v.Handle)
-                        bill.Name = "NameEsp" .. Number
-                        bill.ExtentsOffset = Vector3.new(0, 1, 0)
-                        bill.Size = UDim2.new(1, 200, 1, 30)
-                        bill.Adornee = v.Handle
-                        bill.AlwaysOnTop = true
-                        
-                        local name = Instance.new("TextLabel", bill)
-                        name.Name = "TextLabel"
-                        name.Font = Enum.Font.GothamBold
-                        name.TextSize = 14
-                        name.TextWrapped = true
-                        name.Size = UDim2.new(1, 0, 1, 0)
-                        name.TextYAlignment = Enum.TextYAlignment.Top
-                        name.BackgroundTransparency = 1
-                        name.TextStrokeTransparency = 0.5
-                        name.TextColor3 = Color3.fromRGB(255, 0, 0)
-                        name.Text = v.Name .. " \n" .. Round((player.Character.Head.Position - v.Handle.Position).Magnitude / 3) .. " M"
-                    else
-                        v.Handle["NameEsp" .. Number].TextLabel.Text = v.Name .. " \n" .. Round((player.Character.Head.Position - v.Handle.Position).Magnitude / 3) .. " M"
-                    end
-                end
-            end)
+local FACTORY_POSITION = CFrame.new(448.46756, 199.356781, -441.389252)
+local WAIT_AFTER_CORE = 15
+local EARLY_HOP_TIME = 5
+
+local WEBHOOK_URL = "YOUR_WEBHOOK_URL_HERE"
+
+local RareFruits = {
+    "Buddha", "Love", "Spider", "Sound", "Phoenix", "Portal", "Lightning",
+    "Pain", "Blizzard", "Gravity", "Mammoth", "T-Rex", "Dough", "Shadow",
+    "Venom", "Gas", "Control", "Spirit", "Tiger", "Yeti", "Kitsune",
+    "Dragon", "WestDragon", "EastDragon", "West Dragon", "East Dragon"
+}
+
+if _G.FruitFarmRunning then return end
+_G.FruitFarmRunning = true
+
+local hopRequested = false
+local noClipConnection = nil
+local antiGravityConnection = nil
+local currentTween = nil
+local hakiActivated = false
+
+local CommF_ = nil
+pcall(function() CommF_ = ReplicatedStorage:WaitForChild("Remotes", 10):WaitForChild("CommF_", 10) end)
+
+local function isRareFruit(fruitName)
+    for _, rare in ipairs(RareFruits) do
+        if fruitName:lower():find(rare:lower()) then
+            return true
         end
     end
-    
-    local function CleanupFruitEsp()
-        for _, v in pairs(workspace:GetChildren()) do
-            pcall(function()
-                if string.find(v.Name, "Fruit") and v:FindFirstChild("Handle") then
-                    local esp = v.Handle:FindFirstChild("NameEsp" .. Number)
-                    if esp then esp:Destroy() end
-                end
-            end)
-        end
-    end
-    
-    -- Player ESP (Drawing API - Senin Yaptığın)
-    local Camera = workspace.CurrentCamera
-    
-    local function createPlayerESP(character, targetPlayer)
-        if not character or not character:FindFirstChild("HumanoidRootPart") or not character:FindFirstChild("Head") then
-            return
-        end
-        
-        local nameText = Drawing.new("Text")
-        nameText.Visible = false
-        nameText.Center = true
-        nameText.Outline = true
-        nameText.Color = Color3.fromRGB(255, 255, 255)
-        nameText.Size = 20
-        nameText.Font = 2
-        
-        local connection
-        connection = RunService.RenderStepped:Connect(function()
-            if not ALLAH_MOD_ENABLED or not character or not character:FindFirstChild("HumanoidRootPart") or 
-               not character:FindFirstChild("Head") or not character:FindFirstChild("Humanoid") or 
-               character.Humanoid.Health <= 0 or not player.Character or 
-               not player.Character:FindFirstChild("HumanoidRootPart") then
-                nameText:Remove()
-                connection:Disconnect()
-                espConnections[targetPlayer.UserId] = nil
-                return
-            end
-            
-            local head = character.Head
-            local hrp = character.HumanoidRootPart
-            local localHrp = player.Character.HumanoidRootPart
-            
-            local distance = (localHrp.Position - hrp.Position).Magnitude
-            local headPos = head.Position + Vector3.new(0, head.Size.Y / 2 + 1.5, 0)
-            local headVector, onScreen = Camera:WorldToViewportPoint(headPos)
-            
-            if onScreen then
-                nameText.Position = Vector2.new(headVector.X, headVector.Y)
-                nameText.Text = targetPlayer.Name .. " | " .. math.floor(distance) .. " M"
-                nameText.Visible = true
-                
-                local healthPercent = character.Humanoid.Health / character.Humanoid.MaxHealth
-                if healthPercent > 0.4 then
-                    nameText.Color = Color3.fromRGB(0, 255, 0)
-                else
-                    nameText.Color = Color3.fromRGB(255, 0, 0)
-                end
-            else
-                nameText.Visible = false
-            end
-        end)
-        
-        espConnections[targetPlayer.UserId] = {connection = connection, nameText = nameText}
-    end
-    
-    local function CleanupPlayerESP()
-        for userId, data in pairs(espConnections) do
-            if data.connection then data.connection:Disconnect() end
-            if data.nameText then data.nameText:Remove() end
-        end
-        espConnections = {}
-    end
-    
-    -- Walk on Water (Cokka Hub - Size Değiştirme)
-    local function EnableWalkWater()
-        pcall(function()
-            game:GetService("Workspace").Map["WaterBase-Plane"].Size = Vector3.new(1000, 112, 1000)
-        end)
-    end
-    
-    local function DisableWalkWater()
-        pcall(function()
-            game:GetService("Workspace").Map["WaterBase-Plane"].Size = Vector3.new(1000, 80, 1000)
-        end)
-    end
-    
-    -- Infinite Jump
-    UIS.JumpRequest:Connect(function()
-        if ALLAH_MOD_ENABLED then
-            local c = player.Character
-            if c and c:FindFirstChild("Humanoid") then
-                c.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
-        end
-    end)
-    
-    local function enableAllHacks()
-        local character = player.Character
-        if not character then return end
-        local hum = character:FindFirstChildOfClass("Humanoid")
-        if not hum then return end
-        
-        -- Speed + Dash
-        renderConnection = RunService.RenderStepped:Connect(function()
-            if ALLAH_MOD_ENABLED and character and hum then
-                hum.WalkSpeed = speed
-                character:SetAttribute("DashLength", 100)
-                character:SetAttribute("DashSpeed", 100)
-            end
-        end)
-        
-        -- Walk on Water
-        EnableWalkWater()
-        
-        -- Auto Attack
-        _G.FastAttack = true
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        local Modules = ReplicatedStorage:FindFirstChild("Modules")
-        local Net = Modules and Modules:FindFirstChild("Net")
-        if Net then
-            local RegisterAttack = Net:FindFirstChild("RE/RegisterAttack")
-            local RegisterHit = Net:FindFirstChild("RE/RegisterHit")
-            local Enemies = workspace:FindFirstChild("Enemies")
-            local Characters = workspace:FindFirstChild("Characters")
-            
-            if RegisterAttack and RegisterHit then
-                local Distance = 100
-                
-                local function IsAlive(chr)
-                    return chr and chr:FindFirstChild("Humanoid") and chr.Humanoid.Health > 0
-                end
-                
-                local function ProcessEnemies(OthersEnemies, Folder)
-                    if not Folder then return nil end
-                    local BasePart = nil
-                    for _, Enemy in Folder:GetChildren() do
-                        local Head = Enemy:FindFirstChild("Head")
-                        if Head and IsAlive(Enemy) and player:DistanceFromCharacter(Head.Position) < Distance then
-                            if Enemy ~= player.Character then
-                                table.insert(OthersEnemies, {Enemy, Head})
-                                BasePart = Head
-                            end
-                        end
-                    end
-                    return BasePart
-                end
-                
-                autoAttackConnection = RunService.RenderStepped:Connect(function()
-                    if ALLAH_MOD_ENABLED then
-                        local chr = player.Character
-                        if chr and IsAlive(chr) then
-                            local OthersEnemies = {}
-                            local Part1 = ProcessEnemies(OthersEnemies, Enemies)
-                            local Part2 = ProcessEnemies(OthersEnemies, Characters)
-                            
-                            local equippedWeapon = chr:FindFirstChildOfClass("Tool")
-                            
-                            if equippedWeapon and equippedWeapon:FindFirstChild("LeftClickRemote") then
-                                for _, enemyData in ipairs(OthersEnemies) do
-                                    local enemy = enemyData[1]
-                                    if enemy and enemy:FindFirstChild("HumanoidRootPart") then
-                                        local direction = (enemy.HumanoidRootPart.Position - chr:GetPivot().Position).Unit
-                                        pcall(function()
-                                            equippedWeapon.LeftClickRemote:FireServer(direction, 1)
-                                        end)
-                                    end
-                                end
-                            elseif #OthersEnemies > 0 then
-                                local BasePart = Part1 or Part2
-                                if BasePart then
-                                    pcall(function()
-                                        RegisterAttack:FireServer(0)
-                                        RegisterHit:FireServer(BasePart, OthersEnemies)
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                end)
-            end
-        end
-        
-        -- Fruit ESP Loop
-        fruitEspLoop = task.spawn(function()
-            while ALLAH_MOD_ENABLED do
-                UpdateFruitEsp()
-                task.wait(1)
-            end
-        end)
-        
-        -- Player ESP (Drawing API)
-        for _, targetPlayer in pairs(Players:GetPlayers()) do
-            if targetPlayer ~= player and targetPlayer.Character then
-                createPlayerESP(targetPlayer.Character, targetPlayer)
-            end
-        end
-        
-        Players.PlayerAdded:Connect(function(targetPlayer)
-            targetPlayer.CharacterAdded:Connect(function(character)
-                if ALLAH_MOD_ENABLED then
-                    task.wait(0.5)
-                    createPlayerESP(character, targetPlayer)
-                end
-            end)
-        end)
-    end
-    
-    local function disableAllHacks()
-        local character = player.Character
-        local hum = character and character:FindFirstChildOfClass("Humanoid")
-        
-        if hum then hum.WalkSpeed = defaultSpeed end
-        if character then
-            character:SetAttribute("DashLength", nil)
-            character:SetAttribute("DashSpeed", nil)
-        end
-        
-        if renderConnection then renderConnection:Disconnect() renderConnection = nil end
-        if autoAttackConnection then autoAttackConnection:Disconnect() autoAttackConnection = nil end
-        if fruitEspLoop then task.cancel(fruitEspLoop) fruitEspLoop = nil end
-        
-        _G.FastAttack = false
-        
-        DisableWalkWater()
-        CleanupFruitEsp()
-        CleanupPlayerESP()
-    end
-    
-    toggleButton.MouseButton1Click:Connect(function()
-        ALLAH_MOD_ENABLED = not ALLAH_MOD_ENABLED
-        
-        if ALLAH_MOD_ENABLED then
-            toggleButton.Text = "ON"
-            toggleButton.BackgroundColor3 = Color3.fromRGB(50, 220, 50)
-            enableAllHacks()
-        else
-            toggleButton.Text = "OFF"
-            toggleButton.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
-            disableAllHacks()
-        end
-    end)
-    
-    humanoid.Died:Connect(function()
-        local chr = player.Character
-        if chr then
-            chr:SetAttribute("DashLength", nil)
-            chr:SetAttribute("DashSpeed", nil)
-        end
-        
-        if autoAttackConnection then autoAttackConnection:Disconnect() autoAttackConnection = nil end
-        if renderConnection then renderConnection:Disconnect() renderConnection = nil end
-        if fruitEspLoop then task.cancel(fruitEspLoop) fruitEspLoop = nil end
-        
-        _G.FastAttack = false
-        DisableWalkWater()
-        CleanupFruitEsp()
-        CleanupPlayerESP()
-    end)
-    
-    gui.Destroying:Connect(function()
-        disableAllHacks()
+    return false
+end
+
+local function sendWebhook(fruitName)
+    if WEBHOOK_URL == "YOUR_WEBHOOK_URL_HERE" then return end
+    pcall(function()
+        local data = {
+            ["content"] = "",
+            ["embeds"] = {{
+                ["title"] = "Rare Fruit Found",
+                ["description"] = "**" .. fruitName .. "** has been found",
+                ["color"] = 65280,
+                ["fields"] = {
+                    {["name"] = "Server", ["value"] = tostring(game.JobId), ["inline"] = true},
+                    {["name"] = "Place", ["value"] = tostring(placeId), ["inline"] = true},
+                    {["name"] = "Player", ["value"] = player.Name, ["inline"] = true},
+                    {["name"] = "Time", ["value"] = os.date("%H:%M:%S"), ["inline"] = true}
+                },
+                ["footer"] = {["text"] = "Blox Fruits Farm"}
+            }}
+        }
+        local jsonData = HttpService:JSONEncode(data)
+        local headers = {["Content-Type"] = "application/json"}
+        request({Url = WEBHOOK_URL, Method = "POST", Headers = headers, Body = jsonData})
     end)
 end
 
-player.CharacterAdded:Connect(function(newChar)
-    newChar:SetAttribute("DashLength", nil)
-    newChar:SetAttribute("DashSpeed", nil)
-    _G.FastAttack = false
-    
-    if player.PlayerGui:FindFirstChild("AllahMod") then
-        player.PlayerGui.AllahMod:Destroy()
-    end
-    
-    initializeAllahMod()
+player.Idled:connect(function()
+    VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    wait(1)
+    VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
-initializeAllahMod()
+local function EnableNoClip()
+    if noClipConnection then return end
+    noClipConnection = RunService.Stepped:Connect(function()
+        pcall(function()
+            local chr = player.Character
+            if chr then
+                for _, part in pairs(chr:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    end)
+end
+
+local function EnableAntiGravity()
+    if antiGravityConnection then return end
+    antiGravityConnection = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local chr = player.Character
+            if not chr then return end
+            local hrp = chr:FindFirstChild("HumanoidRootPart")
+            local hum = chr:FindFirstChild("Humanoid")
+            if not hrp then return end
+            if hum then
+                hum.PlatformStand = false
+                hum.Sit = false
+            end
+            local bv = hrp:FindFirstChild("FarmBV")
+            if not bv then
+                bv = Instance.new("BodyVelocity")
+                bv.Name = "FarmBV"
+                bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+                bv.Velocity = Vector3.zero
+                bv.Parent = hrp
+            end
+            bv.Velocity = Vector3.zero
+            local bg = hrp:FindFirstChild("FarmBG")
+            if not bg then
+                bg = Instance.new("BodyGyro")
+                bg.Name = "FarmBG"
+                bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+                bg.P = 50000
+                bg.D = 1000
+                bg.Parent = hrp
+            end
+            bg.CFrame = hrp.CFrame
+        end)
+    end)
+end
+
+local function StopTween()
+    if currentTween then
+        currentTween:Cancel()
+        currentTween = nil
+    end
+end
+
+local function Tween(pos)
+    StopTween()
+    local chr = player.Character
+    local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    local distance = (hrp.Position - pos.Position).Magnitude
+    local timeToReach = distance / speed
+    if timeToReach < 0.1 then
+        hrp.CFrame = pos
+        return nil
+    end
+    currentTween = TweenService:Create(hrp, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = pos})
+    currentTween:Play()
+    return currentTween
+end
+
+local function WaitForTween()
+    if not currentTween then return end
+    repeat task.wait(0.1) until currentTween.PlaybackState ~= Enum.PlaybackState.Playing
+end
+
+local function TP(pos)
+    local chr = player.Character
+    local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.CFrame = pos end
+end
+
+local function Equip(ToolSe)
+    local Tool
+    if player.Backpack:FindFirstChild(ToolSe) then
+        Tool = player.Backpack:FindFirstChild(ToolSe)
+    elseif player.Character and player.Character:FindFirstChild(ToolSe) then
+        Tool = player.Character:FindFirstChild(ToolSe)
+    end
+    if Tool and player.Character then
+        Tool.Parent = player.Character
+    end
+end
+
+local function GetMeleeTool()
+    for _, tool in pairs(player.Backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool.ToolTip == "Melee" then
+            return tool.Name
+        end
+    end
+    if player.Character then
+        for _, tool in pairs(player.Character:GetChildren()) do
+            if tool:IsA("Tool") and tool.ToolTip == "Melee" then
+                return tool.Name
+            end
+        end
+    end
+    return nil
+end
+
+local function equipMelee()
+    local chr = player.Character
+    if not chr then return false end
+    local toolName = GetMeleeTool()
+    if not toolName then return false end
+    local currentTool = chr:FindFirstChildOfClass("Tool")
+    if currentTool and currentTool.Name == toolName then return true end
+    Equip(toolName)
+    return true
+end
+
+local function activateHaki()
+    if hakiActivated then return end
+    pcall(function()
+        if CommF_ then
+            CommF_:InvokeServer("Buso")
+            hakiActivated = true
+        end
+    end)
+end
+
+task.spawn(function()
+    while true do
+        pcall(function()
+            equipMelee()
+            activateHaki()
+        end)
+        task.wait(0.5)
+    end
+end)
+
+local function isValidFruit(obj)
+    if not obj or not obj.Parent then return false end
+    if not string.find(obj.Name, "Fruit", 1, true) then return false end
+    if obj.Name == "Blox Fruit Dealer" then return false end
+    if not obj:IsA("Model") and not obj:IsA("Tool") then return false end
+    local handle = obj:FindFirstChild("Handle")
+    if not handle then return false end
+    local parent = obj.Parent
+    if parent:IsA("Backpack") or parent:FindFirstChild("Humanoid") then return false end
+    return true
+end
+
+local function getAllFruits()
+    local fruits = {}
+    for _, v in pairs(workspace:GetChildren()) do
+        if isValidFruit(v) then
+            table.insert(fruits, v)
+        end
+    end
+    return fruits
+end
+
+local function getNearestFruit()
+    local chr = player.Character
+    local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    local nearestFruit = nil
+    local nearestDistance = math.huge
+    for _, v in pairs(workspace:GetChildren()) do
+        if isValidFruit(v) then
+            local handle = v:FindFirstChild("Handle")
+            if handle then
+                local distance = (hrp.Position - handle.Position).Magnitude
+                if distance < nearestDistance then
+                    nearestDistance = distance
+                    nearestFruit = v
+                end
+            end
+        end
+    end
+    return nearestFruit
+end
+
+local function findCore()
+    local enemies = workspace:FindFirstChild("Enemies")
+    if not enemies then return nil end
+    for _, enemy in pairs(enemies:GetChildren()) do
+        if enemy.Name == "Core" then
+            local hum = enemy:FindFirstChild("Humanoid")
+            if hum and hum.Health > 0 then
+                return enemy
+            end
+        end
+    end
+    return nil
+end
+
+local function getServers()
+    local servers = {}
+    pcall(function()
+        for i = 1, 3 do
+            local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
+            local response = game:HttpGet(url)
+            local data = HttpService:JSONDecode(response)
+            if data and data.data then
+                for _, server in pairs(data.data) do
+                    if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                        table.insert(servers, server)
+                    end
+                end
+            end
+            wait(0.5)
+        end
+    end)
+    return servers
+end
+
+local function serverHop()
+    if hopRequested then return end
+    hopRequested = true
+    print("[Hop] Searching...")
+    while true do
+        pcall(function()
+            local servers = getServers()
+            if #servers == 0 then
+                TeleportService:Teleport(placeId, player)
+            else
+                local randomServer = servers[math.random(1, #servers)]
+                print("[Hop] " .. randomServer.playing .. "/" .. randomServer.maxPlayers)
+                TeleportService:TeleportToPlaceInstance(placeId, randomServer.id, player)
+            end
+        end)
+        task.wait(2)
+    end
+end
+
+local function selectTeam()
+    for i = 1, 50 do
+        pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates") end)
+        local exists = false
+        pcall(function() exists = player.PlayerGui["Main (minimal)"].ChooseTeam.Visible end)
+        if not exists then
+            print("[Team] Pirates")
+            return true
+        end
+        task.wait(0.2)
+    end
+    return false
+end
+
+local function tryRollFruit()
+    pcall(function()
+        if CommF_ then CommF_:InvokeServer("Cousin", "Buy") end
+    end)
+end
+
+task.spawn(function()
+    while true do
+        pcall(function()
+            local chr = player.Character
+            local backpack = player:FindFirstChild("Backpack")
+            if chr then
+                for _, item in pairs(chr:GetChildren()) do
+                    if item:IsA("Tool") and string.find(item.Name, "Fruit") then
+                        local fruitName = item.Name:gsub(" Fruit", "")
+                        if CommF_ then CommF_:InvokeServer("StoreFruit", fruitName .. "-" .. fruitName, item) end
+                    end
+                end
+            end
+            if backpack then
+                for _, item in pairs(backpack:GetChildren()) do
+                    if item:IsA("Tool") and string.find(item.Name, "Fruit") then
+                        local fruitName = item.Name:gsub(" Fruit", "")
+                        if CommF_ then CommF_:InvokeServer("StoreFruit", fruitName .. "-" .. fruitName, item) end
+                    end
+                end
+            end
+        end)
+        task.wait(0.5)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        pcall(function()
+            local chr = player.Character
+            local hum = chr and chr:FindFirstChild("Humanoid")
+            if hum and (hum.Sit or hum:GetState() == Enum.HumanoidStateType.Seated) then
+                hum.Jump = true
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end)
+        task.wait(0.1)
+    end
+end)
+
+local function startFastAttack()
+    task.spawn(function()
+        while true do
+            pcall(function()
+                local chr = player.Character
+                local tool = chr and chr:FindFirstChildOfClass("Tool")
+                if tool and tool.ToolTip ~= "Gun" then
+                    local Enemies = workspace:FindFirstChild("Enemies")
+                    local Modules = ReplicatedStorage:FindFirstChild("Modules")
+                    local Net = Modules and Modules:FindFirstChild("Net")
+                    local RegisterAttack = Net and Net:FindFirstChild("RE/RegisterAttack")
+                    local RegisterHit = Net and Net:FindFirstChild("RE/RegisterHit")
+                    local OthersEnemies = {}
+                    local BasePart = nil
+                    if Enemies then
+                        for _, enemy in pairs(Enemies:GetChildren()) do
+                            local head = enemy:FindFirstChild("Head")
+                            local hum = enemy:FindFirstChild("Humanoid")
+                            if head and hum and hum.Health > 0 then
+                                if player:DistanceFromCharacter(head.Position) < 500 then
+                                    table.insert(OthersEnemies, {enemy, head})
+                                    BasePart = head
+                                end
+                            end
+                        end
+                    end
+                    if #OthersEnemies > 0 and RegisterAttack and RegisterHit then
+                        RegisterAttack:FireServer(0)
+                        RegisterHit:FireServer(BasePart, OthersEnemies)
+                    end
+                    if tool:FindFirstChild("LeftClickRemote") then
+                        for _, data in pairs(OthersEnemies) do
+                            local enemy = data[1]
+                            local enemyHRP = enemy:FindFirstChild("HumanoidRootPart")
+                            if enemyHRP then
+                                local dir = (enemyHRP.Position - chr:GetPivot().Position).Unit
+                                tool.LeftClickRemote:FireServer(dir, 1)
+                            end
+                        end
+                    end
+                end
+            end)
+            task.wait(0.05)
+        end
+    end)
+end
+
+local function goToFactory()
+    print("[Factory] Going...")
+    Tween(FACTORY_POSITION)
+    WaitForTween()
+    TP(FACTORY_POSITION)
+end
+
+local function farmCore()
+    local core = findCore()
+    if not core then return false end
+    print("[Core] Farming...")
+    while findCore() do
+        local currentCore = findCore()
+        if currentCore then
+            local coreHRP = currentCore:FindFirstChild("HumanoidRootPart")
+            if coreHRP then
+                TP(CFrame.new(coreHRP.Position + Vector3.new(0, 10, 0)))
+            end
+        end
+        task.wait(0.1)
+    end
+    print("[Core] Dead")
+    return true
+end
+
+local function collectFruit(fruit)
+    local chr = player.Character
+    local hrp = chr and chr:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local handle = fruit:FindFirstChild("Handle")
+    if not handle then return false end
+    local fruitName = fruit.Name
+    if isRareFruit(fruitName) then
+        print("[RARE] " .. fruitName .. " found, sending webhook...")
+        sendWebhook(fruitName)
+    end
+    local startTime = tick()
+    while isValidFruit(fruit) do
+        if tick() - startTime > 15 then break end
+        if findCore() then break end
+        local currentHandle = fruit:FindFirstChild("Handle")
+        if not currentHandle then break end
+        local targetPos = currentHandle.Position
+        local dist = (hrp.Position - targetPos).Magnitude
+        if dist < 3 then
+            TP(CFrame.new(targetPos))
+            local waitTime = 0
+            while isValidFruit(fruit) and waitTime < 2 do
+                local h = fruit:FindFirstChild("Handle")
+                if h then TP(CFrame.new(h.Position)) end
+                task.wait(0.05)
+                waitTime = waitTime + 0.05
+            end
+            break
+        end
+        Tween(CFrame.new(targetPos))
+        task.wait(0.1)
+    end
+    StopTween()
+    if not isValidFruit(fruit) then
+        print("[Collected] " .. fruitName)
+        return true
+    end
+    return false
+end
+
+local function collectAllFruits()
+    local collected = false
+    while true do
+        if findCore() then break end
+        local nearestFruit = getNearestFruit()
+        if not nearestFruit then break end
+        if collectFruit(nearestFruit) then
+            collected = true
+        end
+        task.wait(0.2)
+    end
+    return collected
+end
+
+local function mainLoop()
+    local core = findCore()
+    if core then
+        goToFactory()
+        farmCore()
+        print("[Wait] " .. WAIT_AFTER_CORE .. "s fruit check...")
+        local fruitFound = false
+        local noFruitTime = 0
+        for i = WAIT_AFTER_CORE, 1, -1 do
+            if findCore() then
+                print("[Core] Spawned during wait, going to factory...")
+                goToFactory()
+                farmCore()
+                fruitFound = false
+                noFruitTime = 0
+            end
+            local fruits = getAllFruits()
+            if #fruits > 0 then
+                print("[Fruit] " .. #fruits .. " found")
+                collectAllFruits()
+                fruitFound = true
+                noFruitTime = 0
+            else
+                noFruitTime = noFruitTime + 1
+            end
+            if noFruitTime >= EARLY_HOP_TIME and not fruitFound then
+                print("[Skip] No fruits for " .. EARLY_HOP_TIME .. "s, hopping...")
+                break
+            end
+            if i % 5 == 0 then
+                print("[Wait] " .. i .. "s...")
+            end
+            task.wait(1)
+        end
+        local finalFruits = getAllFruits()
+        if #finalFruits > 0 then
+            print("[Fruit] Final " .. #finalFruits)
+            collectAllFruits()
+        end
+        serverHop()
+    else
+        local fruits = getAllFruits()
+        if #fruits > 0 then
+            print("[Fruit] " .. #fruits .. " found")
+            collectAllFruits()
+            print("[Check] 5s checking after fruit collection...")
+            for i = 1, EARLY_HOP_TIME do
+                if findCore() then
+                    print("[Core] Found after fruit collection, going to factory...")
+                    goToFactory()
+                    farmCore()
+                    print("[Wait] " .. WAIT_AFTER_CORE .. "s fruit check...")
+                    local noFruitTime = 0
+                    for j = WAIT_AFTER_CORE, 1, -1 do
+                        if findCore() then
+                            goToFactory()
+                            farmCore()
+                            noFruitTime = 0
+                        end
+                        local moreFruits = getAllFruits()
+                        if #moreFruits > 0 then
+                            collectAllFruits()
+                            noFruitTime = 0
+                        else
+                            noFruitTime = noFruitTime + 1
+                        end
+                        if noFruitTime >= EARLY_HOP_TIME then break end
+                        task.wait(1)
+                    end
+                    serverHop()
+                    return
+                end
+                local moreFruits = getAllFruits()
+                if #moreFruits > 0 then
+                    collectAllFruits()
+                    i = 0
+                end
+                task.wait(1)
+            end
+            serverHop()
+        else
+            print("[None] No fruits or core, checking...")
+            local foundSomething = false
+            for i = 1, EARLY_HOP_TIME do
+                if findCore() then
+                    print("[Core] Found, going to factory...")
+                    goToFactory()
+                    farmCore()
+                    foundSomething = true
+                    print("[Wait] " .. WAIT_AFTER_CORE .. "s fruit check...")
+                    local noFruitTime = 0
+                    for j = WAIT_AFTER_CORE, 1, -1 do
+                        if findCore() then
+                            goToFactory()
+                            farmCore()
+                            noFruitTime = 0
+                        end
+                        local moreFruits = getAllFruits()
+                        if #moreFruits > 0 then
+                            collectAllFruits()
+                            noFruitTime = 0
+                        else
+                            noFruitTime = noFruitTime + 1
+                        end
+                        if noFruitTime >= EARLY_HOP_TIME then break end
+                        task.wait(1)
+                    end
+                    serverHop()
+                    return
+                end
+                local checkFruits = getAllFruits()
+                if #checkFruits > 0 then
+                    print("[Fruit] " .. #checkFruits .. " found")
+                    collectAllFruits()
+                    foundSomething = true
+                    for k = 1, EARLY_HOP_TIME do
+                        if findCore() then
+                            goToFactory()
+                            farmCore()
+                            serverHop()
+                            return
+                        end
+                        local moreCheckFruits = getAllFruits()
+                        if #moreCheckFruits > 0 then
+                            collectAllFruits()
+                            k = 0
+                        end
+                        task.wait(1)
+                    end
+                    serverHop()
+                    return
+                end
+                print("[Check] " .. i .. "/" .. EARLY_HOP_TIME .. "s")
+                task.wait(1)
+            end
+            if not foundSomething then
+                print("[None] Nothing spawned, hopping...")
+            end
+            serverHop()
+        end
+    end
+end
+
+task.spawn(function()
+    repeat task.wait(0.5) until game:IsLoaded()
+    task.wait(1)
+    print("[Start] Fruit Farm + Factory")
+    selectTeam()
+    task.wait(2)
+    repeat task.wait(0.5) until player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    EnableNoClip()
+    EnableAntiGravity()
+    startFastAttack()
+    tryRollFruit()
+    task.wait(1)
+    while true do
+        pcall(function()
+            mainLoop()
+        end)
+        task.wait(1)
+    end
+end)
+
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    StopTween()
+    hakiActivated = false
+    EnableNoClip()
+    EnableAntiGravity()
+end)
+
+print("[Init] Ready")
