@@ -14,7 +14,7 @@ local FACTORY_POSITION = CFrame.new(448.46756, 199.356781, -441.389252)
 local WAIT_AFTER_CORE = 15
 local EARLY_HOP_TIME = 5
 
-local WEBHOOK_URL = "https://discord.com/api/webhooks/1465029240679301270/Kucq7-II9-ecYVcSMTZGDv87_gttt3hFLV_E7eSEowqcvH8SGr4JK8m81GksJwF1R3-W"
+local WEBHOOK_URL = ""
 
 local RareFruits = {
     "Buddha", "Love", "Spider", "Sound", "Phoenix", "Portal", "Lightning",
